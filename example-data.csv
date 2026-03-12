@@ -1,0 +1,19 @@
+type,name,lat,lng,description,buildingName,roomNumber,floor,department
+building,Academic Block A,18.2351,83.4126,Main engineering building,,,,,
+building,Academic Block B,18.2358,83.4135,Science departments,,,,,
+building,Library,18.2355,83.4130,Central library with study halls,,,,,
+building,Administration Block,18.2345,83.4122,Main office and admin,,,,,
+building,Hostel Block 1,18.2365,83.4145,Boys hostel,,,,,
+building,Hostel Block 2,18.2370,83.4150,Girls hostel,,,,,
+building,Cafeteria,18.2348,83.4128,Student dining hall,,,,,
+landmark,Main Gate,18.2340,83.4120,Campus main entrance,,,,,
+landmark,Sports Complex,18.2375,83.4155,Indoor and outdoor sports,,,,,
+landmark,Auditorium,18.2353,83.4132,Main auditorium for events,,,,,
+room,,,18.2352,83.4127,,Academic Block A,101,1,Computer Science
+room,,,18.2353,83.4128,,Academic Block A,102,1,Computer Science
+room,,,18.2352,83.4129,,Academic Block A,201,2,Electronics
+room,,,18.2353,83.4130,,Academic Block A,202,2,Electronics
+room,,,18.2359,83.4136,,Academic Block B,101,1,Physics
+room,,,18.2360,83.4137,,Academic Block B,102,1,Chemistry
+room,,,18.2359,83.4138,,Academic Block B,201,2,Mathematics
+room,,,18.2360,83.4139,,Academic Block B,202,2,Biology
