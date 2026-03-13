@@ -4,11 +4,11 @@ import { MapPin, X, Navigation } from 'lucide-react';
 
 function LocationPicker({ isOpen, onClose, onSelectLocation }) {
   const commonLocations = [
-    { name: 'Main Gate', lat: 18.059400, lng: 83.404200 },
-    { name: 'Main Academic Block', lat: 18.060005, lng: 83.405167 },
-    { name: 'Library', lat: 18.060200, lng: 83.405900 },
-    { name: 'Cafeteria', lat: 18.059800, lng: 83.405500 },
-    { name: 'Sports Complex', lat: 18.060800, lng: 83.406200 }
+    { name: 'Main Gate', lat: 18.05997021737144 - 0.00045, lng: 83.40515640049136 - 0.0003 },
+    { name: 'Main Academic Block', lat: 18.05997021737144, lng: 83.40515640049136 },
+    { name: 'Library Building', lat: 18.05997021737144 + 0.0002, lng: 83.40515640049136 - 0.0003 },
+    { name: 'Cafeteria', lat: 18.05997021737144, lng: 83.40515640049136 + 0.00035 },
+    { name: 'Sports Complex', lat: 18.05997021737144 + 0.0003, lng: 83.40515640049136 + 0.0004 }
   ];
 
   if (!isOpen) return null;

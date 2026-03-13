@@ -1,21 +1,101 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Fix for default marker icons in React-Leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, route, showLayerPanel, onLayerChange }) {
+  const mapContainer = useRef(null);
+  const map = useRef(null);
+  const markersRef = useRef([]);
+  const [currentStyle, setCurrentStyle] = useState('streets-v12');
+  const [mapboxToken, setMapboxToken] = useState('');
+  const [mapReady, setMapReady] = useState(false);
 
-// Custom marker icons
-const createCustomIcon = (emoji, color) => {
-  return L.divIcon({
-    html: `
+  // Map styles
+  const mapStyles = {
+    'streets-v12': { name: 'Street Map', icon: '🗺️' },
+    'satellite-streets-v12': { name: 'Satellite', icon: '🛰️' },
+    'outdoors-v12': { name: 'Terrain', icon: '⛰️' },
+    'dark-v11': { name: 'Dark Mode', icon: '🌙' }
+  };
+
+  // Fetch Mapbox token from backend
+  useEffect(() => {
+    fetch('/api/mapbox-token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          mapboxgl.accessToken = data.token;
+          setMapboxToken(data.token);
+        }
+      })
+      .catch(err => console.error('Error fetching Mapbox token:', err));
+  }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (map.current || !mapboxToken) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: `mapbox://styles/mapbox/${currentStyle}`,
+      center: [83.40515640049136, 18.05997021737144],
+      zoom: 17,
+      minZoom: 14,
+      maxZoom: 20,
+      pitch: 0,
+      bearing: 0
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl({
+      showCompass: true,
+      showZoom: true,
+      visualizePitch: true
+    }), 'bottom-right');
+    
+    map.current.addControl(new mapboxgl.ScaleControl({
+      maxWidth: 100,
+      unit: 'metric'
+    }), 'bottom-left');
+
+    map.current.on('load', () => {
+      setMapReady(true);
+    });
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, [mapboxToken]);
+
+  const handleStyleChange = (styleKey) => {
+    if (map.current) {
+      map.current.setStyle(`mapbox://styles/mapbox/${styleKey}`);
+      setCurrentStyle(styleKey);
+      
+      map.current.once('style.load', () => {
+        addAllMarkers();
+        if (route) {
+          addRouteToMap(route);
+        }
+      });
+    }
+    if (onLayerChange) {
+      onLayerChange();
+    }
+  };
+
+  const clearMarkers = () => {
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+  };
+
+  const createMarkerElement = (emoji, color) => {
+    const el = document.createElement('div');
+    el.className = 'custom-marker';
+    el.innerHTML = `
       <div style="
         width: 32px;
         height: 32px;
@@ -28,142 +108,209 @@ const createCustomIcon = (emoji, color) => {
         font-size: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         cursor: pointer;
-        transition: transform 0.3s;
-      " class="custom-marker">
+        transition: transform 0.2s ease;
+        pointer-events: auto;
+      ">
         ${emoji}
       </div>
-    `,
-    className: 'custom-icon',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
-  });
-};
+    `;
+    
+    const innerDiv = el.querySelector('div');
+    el.addEventListener('mouseenter', () => {
+      if (innerDiv) {
+        innerDiv.style.transform = 'scale(1.15)';
+      }
+    });
+    el.addEventListener('mouseleave', () => {
+      if (innerDiv) {
+        innerDiv.style.transform = 'scale(1)';
+      }
+    });
+    
+    return el;
+  };
 
-const buildingIcon = createCustomIcon('🏢', '#2563EB');
-const roomIcon = createCustomIcon('🚪', '#10B981');
-const landmarkIcon = createCustomIcon('📍', '#F59E0B');
+  const addAllMarkers = () => {
+    if (!map.current) return;
+    clearMarkers();
 
-const userLocationIcon = L.divIcon({
-  html: `
-    <div style="
-      width: 20px;
-      height: 20px;
-      background: #EF4444;
-      border: 4px solid white;
-      border-radius: 50%;
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-      animation: pulse 2s infinite;
-    "></div>
-  `,
-  className: 'user-location-icon',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10]
-});
+    buildings.forEach((building) => {
+      const el = createMarkerElement('🏢', '#2563EB');
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div style="padding: 12px; min-width: 200px;">
+          ${building.image ? `<img src="${building.image}" alt="${building.name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
+          <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">${building.name}</h3>
+          <p style="font-size: 13px; color: #6B7280; margin: 0;">${building.description || ''}</p>
+        </div>
+      `);
+      
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([building.coordinates.lng, building.coordinates.lat])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markersRef.current.push(marker);
+    });
 
-// Component to handle map updates
-function MapUpdater({ center, zoom, bounds }) {
-  const map = useMap();
+    rooms.forEach((room) => {
+      const el = createMarkerElement('🚪', '#10B981');
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div style="padding: 12px; min-width: 180px;">
+          <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">Room ${room.roomNumber}</h3>
+          <p style="font-size: 13px; color: #6B7280; margin: 2px 0;">${room.buildingId?.name || ''}</p>
+          <p style="font-size: 12px; color: #9CA3AF; margin: 2px 0;">Floor ${room.floor} • ${room.department}</p>
+        </div>
+      `);
+      
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([room.coordinates.lng, room.coordinates.lat])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markersRef.current.push(marker);
+    });
+
+    landmarks.forEach((landmark) => {
+      const el = createMarkerElement('📍', '#F59E0B');
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div style="padding: 12px; min-width: 200px;">
+          ${landmark.image ? `<img src="${landmark.image}" alt="${landmark.name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
+          <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">${landmark.name}</h3>
+          <p style="font-size: 13px; color: #6B7280; margin: 0;">${landmark.description || ''}</p>
+        </div>
+      `);
+      
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([landmark.coordinates.lng, landmark.coordinates.lat])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markersRef.current.push(marker);
+    });
+
+    if (userLocation) {
+      const userEl = document.createElement('div');
+      userEl.className = 'user-location-marker';
+      userEl.innerHTML = `
+        <div style="
+          width: 20px;
+          height: 20px;
+          background: #EF4444;
+          border: 4px solid white;
+          border-radius: 50%;
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+          animation: pulse 2s infinite;
+        "></div>
+      `;
+      
+      const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(`
+        <div style="padding: 8px;">
+          <p style="font-weight: 600; margin: 0;">Your Location</p>
+        </div>
+      `);
+      
+      const marker = new mapboxgl.Marker({ element: userEl })
+        .setLngLat([userLocation.lng, userLocation.lat])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markersRef.current.push(marker);
+    }
+  };
 
   useEffect(() => {
-    if (bounds) {
-      map.fitBounds(bounds, { padding: [50, 50] });
-    } else if (center) {
-      map.flyTo(center, zoom || map.getZoom(), {
-        duration: 1.5
+    if (map.current && mapReady) {
+      addAllMarkers();
+    }
+  }, [buildings, rooms, landmarks, userLocation, mapReady]);
+
+  useEffect(() => {
+    if (map.current && userLocation && mapReady) {
+      map.current.flyTo({
+        center: [userLocation.lng, userLocation.lat],
+        zoom: 18,
+        duration: 2000
       });
     }
-  }, [center, zoom, bounds, map]);
-
-  return null;
-}
-
-function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, route, showLayerPanel, onLayerChange }) {
-  const [mapCenter, setMapCenter] = useState([18.060005, 83.405167]);
-  const [mapZoom, setMapZoom] = useState(17);
-  const [mapBounds, setMapBounds] = useState(null);
-  const [tileError, setTileError] = useState(false);
-  const [currentLayer, setCurrentLayer] = useState('street'); // street, satellite, terrain, dark
+  }, [userLocation, mapReady]);
 
   useEffect(() => {
-    if (userLocation) {
-      setMapCenter([userLocation.lat, userLocation.lng]);
-      setMapZoom(18);
-      setMapBounds(null);
+    if (map.current && selectedLocation && mapReady) {
+      map.current.flyTo({
+        center: [selectedLocation.lng, selectedLocation.lat],
+        zoom: 18,
+        duration: 2000
+      });
     }
-  }, [userLocation]);
+  }, [selectedLocation, mapReady]);
 
-  useEffect(() => {
-    if (selectedLocation) {
-      setMapCenter([selectedLocation.lat, selectedLocation.lng]);
-      setMapZoom(18);
-      setMapBounds(null);
+  const addRouteToMap = (routeData) => {
+    if (!map.current || !routeData || !routeData.geometry) return;
+
+    if (map.current.getLayer('route')) {
+      map.current.removeLayer('route');
     }
-  }, [selectedLocation]);
-
-  useEffect(() => {
-    if (route && route.geometry && route.geometry.coordinates) {
-      const coords = route.geometry.coordinates;
-      const bounds = L.latLngBounds(
-        coords.map(coord => [coord[1], coord[0]])
-      );
-      setMapBounds(bounds);
+    if (map.current.getLayer('route-outline')) {
+      map.current.removeLayer('route-outline');
     }
-  }, [route]);
-
-  const routeCoordinates = route && route.geometry && route.geometry.coordinates
-    ? route.geometry.coordinates.map(coord => [coord[1], coord[0]])
-    : [];
-
-  // Map layer configurations
-  const mapLayers = {
-    street: {
-      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      name: 'Street Map',
-      icon: '🗺️',
-      maxZoom: 19
-    },
-    satellite: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri',
-      name: 'Satellite',
-      icon: '🛰️',
-      maxZoom: 19
-    },
-    terrain: {
-      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-      name: 'Terrain',
-      icon: '⛰️',
-      maxZoom: 17
-    },
-    dark: {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      name: 'Dark Mode',
-      icon: '🌙',
-      maxZoom: 19
+    if (map.current.getSource('route')) {
+      map.current.removeSource('route');
     }
+
+    map.current.addSource('route', {
+      type: 'geojson',
+      data: routeData
+    });
+
+    map.current.addLayer({
+      id: 'route-outline',
+      type: 'line',
+      source: 'route',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#1E40AF',
+        'line-width': 8,
+        'line-opacity': 0.4
+      }
+    });
+
+    map.current.addLayer({
+      id: 'route',
+      type: 'line',
+      source: 'route',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#3B82F6',
+        'line-width': 5,
+        'line-opacity': 0.9
+      }
+    });
+
+    const coordinates = routeData.geometry.coordinates;
+    const bounds = coordinates.reduce((bounds, coord) => {
+      return bounds.extend(coord);
+    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+    map.current.fitBounds(bounds, {
+      padding: { top: 100, bottom: 100, left: 100, right: 100 },
+      duration: 2000
+    });
   };
 
-  const handleLayerChange = (layerKey) => {
-    setCurrentLayer(layerKey);
-    if (onLayerChange) {
-      onLayerChange();
+  useEffect(() => {
+    if (map.current && route && mapReady) {
+      addRouteToMap(route);
     }
-  };
+  }, [route, mapReady]);
 
   return (
     <div className="relative w-full h-full">
-      {tileError && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-100 border border-amber-400 text-amber-800 px-4 py-3 rounded-lg shadow-lg max-w-md">
-          <p className="text-sm font-medium">⚠️ Map tiles unavailable (offline mode)</p>
-          <p className="text-xs mt-1">Navigation still works! Markers show building locations.</p>
-        </div>
-      )}
-
-      {/* Map Layer Selector - Only show when showLayerPanel is true */}
       <AnimatePresence>
         {showLayerPanel && (
           <motion.div
@@ -175,21 +322,21 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
             <div className="p-3">
               <p className="text-xs font-semibold text-gray-700 px-2 mb-2">Map Style</p>
               <div className="space-y-1">
-                {Object.entries(mapLayers).map(([key, layer]) => (
+                {Object.entries(mapStyles).map(([key, style]) => (
                   <motion.button
                     key={key}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => handleLayerChange(key)}
+                    onClick={() => handleStyleChange(key)}
                     className={`w-full px-3 py-2.5 text-left text-sm rounded-lg transition-colors flex items-center gap-2 ${
-                      currentLayer === key
+                      currentStyle === key
                         ? 'bg-blue-600 text-white font-medium shadow-md'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <span className="text-base">{layer.icon}</span>
-                    <span>{layer.name}</span>
-                    {currentLayer === key && (
+                    <span className="text-base">{style.icon}</span>
+                    <span>{style.name}</span>
+                    {currentStyle === key && (
                       <span className="ml-auto text-xs">✓</span>
                     )}
                   </motion.button>
@@ -199,152 +346,22 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
           </motion.div>
         )}
       </AnimatePresence>
-      
-      <MapContainer
-        center={mapCenter}
-        zoom={mapZoom}
-        minZoom={10}
-        maxZoom={19}
-        style={{ width: '100%', height: '100%', background: '#f0f0f0' }}
-        zoomControl={true}
-      >
-        {/* Dynamic tile layer based on selection */}
-        <TileLayer
-          key={currentLayer}
-          attribution={mapLayers[currentLayer].attribution}
-          url={mapLayers[currentLayer].url}
-          maxNativeZoom={mapLayers[currentLayer].maxZoom}
-          maxZoom={19}
-          errorTileUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Crect width='256' height='256' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-size='14'%3EOffline%3C/text%3E%3C/svg%3E"
-          eventHandlers={{
-            tileerror: () => setTileError(true),
-            tileload: () => setTileError(false)
-          }}
-        />
 
-        <MapUpdater center={mapCenter} zoom={mapZoom} bounds={mapBounds} />
+      <div ref={mapContainer} className="w-full h-full" />
 
-        {/* Building Markers */}
-        {buildings.map((building) => (
-          <Marker
-            key={building._id}
-            position={[building.coordinates.lat, building.coordinates.lng]}
-            icon={buildingIcon}
-          >
-            <Popup>
-              <div style={{ padding: '12px', minWidth: '200px' }}>
-                {building.image && (
-                  <img
-                    src={building.image}
-                    alt={building.name}
-                    style={{
-                      width: '100%',
-                      height: '120px',
-                      objectFit: 'cover',
-                      borderRadius: '8px',
-                      marginBottom: '8px'
-                    }}
-                  />
-                )}
-                <h3 style={{ fontWeight: 700, fontSize: '16px', marginBottom: '4px', color: '#1F2937' }}>
-                  {building.name}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
-                  {building.description || ''}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Room Markers */}
-        {rooms.map((room) => (
-          <Marker
-            key={room._id}
-            position={[room.coordinates.lat, room.coordinates.lng]}
-            icon={roomIcon}
-          >
-            <Popup>
-              <div style={{ padding: '12px', minWidth: '180px' }}>
-                <h3 style={{ fontWeight: 700, fontSize: '16px', marginBottom: '4px', color: '#1F2937' }}>
-                  Room {room.roomNumber}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#6B7280', margin: '2px 0' }}>
-                  {room.buildingId?.name || ''}
-                </p>
-                <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0' }}>
-                  Floor {room.floor} • {room.department}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Landmark Markers */}
-        {landmarks.map((landmark) => (
-          <Marker
-            key={landmark._id}
-            position={[landmark.coordinates.lat, landmark.coordinates.lng]}
-            icon={landmarkIcon}
-          >
-            <Popup>
-              <div style={{ padding: '12px', minWidth: '200px' }}>
-                {landmark.image && (
-                  <img
-                    src={landmark.image}
-                    alt={landmark.name}
-                    style={{
-                      width: '100%',
-                      height: '120px',
-                      objectFit: 'cover',
-                      borderRadius: '8px',
-                      marginBottom: '8px'
-                    }}
-                  />
-                )}
-                <h3 style={{ fontWeight: 700, fontSize: '16px', marginBottom: '4px', color: '#1F2937' }}>
-                  {landmark.name}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
-                  {landmark.description || ''}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* User Location Marker */}
-        {userLocation && (
-          <Marker
-            position={[userLocation.lat, userLocation.lng]}
-            icon={userLocationIcon}
-          >
-            <Popup>
-              <div style={{ padding: '8px' }}>
-                <p style={{ fontWeight: 600, margin: 0 }}>Your Location</p>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Route Line */}
-        {routeCoordinates.length > 0 && (
-          <>
-            <Polyline
-              positions={routeCoordinates}
-              color="#1E40AF"
-              weight={8}
-              opacity={0.4}
-            />
-            <Polyline
-              positions={routeCoordinates}
-              color="#3B82F6"
-              weight={5}
-              opacity={0.9}
-            />
-          </>
-        )}
-      </MapContainer>
+      <style>{`
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

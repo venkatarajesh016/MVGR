@@ -7,10 +7,14 @@ import InfoDrawer from '../components/InfoDrawer';
 import TopNavBar from '../components/TopNavBar';
 import FloatingActionButtons from '../components/FloatingActionButtons';
 import LocationPicker from '../components/LocationPicker';
+import WaypointGallery from '../components/WaypointGallery';
+import ProfileSidebar from '../components/ProfileSidebar';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Building2, DoorOpen, MapPin, Loader2 } from 'lucide-react';
 
 function Home() {
+  const { user } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [landmarks, setLandmarks] = useState([]);
@@ -24,6 +28,9 @@ function Home() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showWaypointGallery, setShowWaypointGallery] = useState(false);
+  const [waypointImages, setWaypointImages] = useState([]);
+  const [showProfileSidebar, setShowProfileSidebar] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -62,8 +69,8 @@ function Home() {
           console.error('Error getting location:', error);
           // Set default location to campus center if geolocation fails
           setUserLocation({
-            lat: 18.060005,
-            lng: 83.405167
+            lat: 18.05997021737144,
+            lng: 83.40515640049136
           });
         },
         {
@@ -75,8 +82,8 @@ function Home() {
     } else {
       // Geolocation not supported, use campus center
       setUserLocation({
-        lat: 18.060005,
-        lng: 83.405167
+        lat: 18.05997021737144,
+        lng: 83.40515640049136
       });
     }
   };
@@ -106,8 +113,8 @@ function Home() {
 
     // If no user location, use campus center as starting point
     const startLocation = userLocation || {
-      lat: 18.060005,
-      lng: 83.405167
+      lat: 18.05997021737144,
+      lng: 83.40515640049136
     };
 
     try {
@@ -120,8 +127,21 @@ function Home() {
         selectedLocation.name // End building name
       );
       
+      console.log('Route data received:', routeData);
+      console.log('Waypoint images:', routeData.properties?.waypointImages);
+      
       setRoute(routeData);
       setDistance(routeData.properties.distance);
+      
+      // Store waypoint images if available
+      if (routeData.properties && routeData.properties.waypointImages) {
+        console.log('Setting waypoint images:', routeData.properties.waypointImages);
+        setWaypointImages(routeData.properties.waypointImages);
+      } else {
+        console.log('No waypoint images found in route data');
+        setWaypointImages([]);
+      }
+      
       setShowDrawer(false);
     } catch (error) {
       console.error('Error getting route:', error);
@@ -136,6 +156,8 @@ function Home() {
     setRoute(null);
     setDistance(null);
     setShowDrawer(false);
+    setWaypointImages([]);
+    setShowWaypointGallery(false);
   };
 
   const handleLocate = () => {
@@ -170,7 +192,10 @@ function Home() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gray-100">
-      <TopNavBar campusName="Campus Navigator" />
+      <TopNavBar 
+        campusName="Campus Navigator" 
+        onMenuClick={() => setShowProfileSidebar(true)}
+      />
       
       <MapView
         buildings={buildings}
@@ -218,6 +243,33 @@ function Home() {
           onClear={handleClear}
         />
       )}
+
+      {/* Waypoint Images Button */}
+      {waypointImages.length > 0 && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          onClick={() => setShowWaypointGallery(true)}
+          className="absolute bottom-24 left-4 z-20 bg-blue-600 text-white px-4 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
+        >
+          <MapPin className="w-5 h-5" />
+          <span>View Route Images ({waypointImages.length})</span>
+        </motion.button>
+      )}
+
+      {/* Waypoint Gallery Modal */}
+      {showWaypointGallery && (
+        <WaypointGallery
+          waypointImages={waypointImages}
+          onClose={() => setShowWaypointGallery(false)}
+        />
+      )}
+
+      {/* Profile Sidebar */}
+      <ProfileSidebar
+        isOpen={showProfileSidebar}
+        onClose={() => setShowProfileSidebar(false)}
+      />
 
       {/* Legend */}
       <motion.div

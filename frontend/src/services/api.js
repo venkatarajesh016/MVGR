@@ -2,6 +2,41 @@ import axios from 'axios';
 
 const API_BASE_URL = '/api';
 
+// Add request interceptor to attach token
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const registerUser = async (formData) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/register`, formData);
+  return response.data;
+};
+
+export const loginUser = async (email, password) => {
+  const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+  return response.data;
+};
+
+export const getMe = async () => {
+  const response = await axios.get(`${API_BASE_URL}/auth/me`);
+  return response.data;
+};
+
+export const updateProfile = async (data) => {
+  const response = await axios.put(`${API_BASE_URL}/auth/update-profile`, data);
+  return response.data;
+};
+
 export const api = {
   // Buildings
   getBuildings: async () => {

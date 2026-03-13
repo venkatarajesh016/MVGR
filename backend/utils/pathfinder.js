@@ -1,147 +1,153 @@
 // Campus walkable paths network
 // Defines the actual walking paths between key points on campus
-// Coordinates based on your campus center: 18.060005, 83.405167
+// Coordinates based on your campus center: 18.05997021737144, 83.40515640049136
+// 100m radius coverage
+
+const centerLat = 18.05997021737144;
+const centerLng = 83.40515640049136;
 
 const campusWalkways = {
   // Main intersections and path nodes (road junctions)
   nodes: {
-    // Main entrance area
-    'main_gate': { lat: 18.059400, lng: 83.404200 },
-    'gate_junction': { lat: 18.059500, lng: 83.404400 },
-    'parking_junction': { lat: 18.059600, lng: 83.404600 },
+    // Central area
+    'central_plaza': { lat: centerLat, lng: centerLng },
+    'main_road_north': { lat: centerLat + 0.0006, lng: centerLng },
+    'main_road_south': { lat: centerLat - 0.0006, lng: centerLng },
+    'main_road_east': { lat: centerLat, lng: centerLng + 0.0006 },
+    'main_road_west': { lat: centerLat, lng: centerLng - 0.0006 },
     
-    // Central road system
-    'admin_junction': { lat: 18.059700, lng: 83.404800 },
-    'medical_junction': { lat: 18.059900, lng: 83.404700 },
-    'central_plaza': { lat: 18.060005, lng: 83.405167 },
-    'main_road_north': { lat: 18.060300, lng: 83.405167 },
-    'main_road_south': { lat: 18.059700, lng: 83.405167 },
+    // North area
+    'north_junction': { lat: centerLat + 0.0007, lng: centerLng + 0.0002 },
+    'cs_block_road': { lat: centerLat + 0.0006, lng: centerLng + 0.0004 },
+    'hostel_a_road': { lat: centerLat + 0.0008, lng: centerLng + 0.0006 },
+    'sports_road': { lat: centerLat + 0.0006, lng: centerLng + 0.0008 },
+    'north_gate': { lat: centerLat + 0.0009, lng: centerLng + 0.0003 },
     
-    // Academic area roads
-    'science_road': { lat: 18.060450, lng: 83.404500 },
-    'science_junction': { lat: 18.060350, lng: 83.404700 },
-    'eng_road_west': { lat: 18.060200, lng: 83.405600 },
-    'eng_junction': { lat: 18.060300, lng: 83.405800 },
-    'eng_road_east': { lat: 18.060100, lng: 83.405900 },
+    // South area
+    'south_junction': { lat: centerLat - 0.0007, lng: centerLng - 0.0002 },
+    'admin_road': { lat: centerLat - 0.0006, lng: centerLng - 0.0004 },
+    'auditorium_road': { lat: centerLat - 0.0007, lng: centerLng },
+    'main_gate': { lat: centerLat - 0.0009, lng: centerLng - 0.0006 },
+    'bus_stop': { lat: centerLat - 0.0008, lng: centerLng - 0.0005 },
     
-    // Library and workshop area
-    'library_junction': { lat: 18.060200, lng: 83.405900 },
-    'workshop_road': { lat: 18.060300, lng: 83.406000 },
+    // East area
+    'east_junction': { lat: centerLat + 0.0002, lng: centerLng + 0.0007 },
+    'cafeteria_road': { lat: centerLat, lng: centerLng + 0.0007 },
+    'eng_block_a_road': { lat: centerLat - 0.0004, lng: centerLng + 0.0006 },
+    'parking_a_road': { lat: centerLat - 0.0006, lng: centerLng + 0.0007 },
+    'hostel_b_road': { lat: centerLat - 0.0008, lng: centerLng + 0.0004 },
+    'workshop_road': { lat: centerLat - 0.0005, lng: centerLng + 0.0007 },
     
-    // Cafeteria area
-    'cafeteria_road': { lat: 18.059800, lng: 83.405500 },
-    'cafeteria_junction': { lat: 18.059900, lng: 83.405400 },
+    // West area
+    'west_junction': { lat: centerLat + 0.0002, lng: centerLng - 0.0005 },
+    'library_road': { lat: centerLat + 0.0004, lng: centerLng - 0.0006 },
+    'medical_road': { lat: centerLat - 0.0002, lng: centerLng - 0.0006 },
+    'eng_block_b_road': { lat: centerLat + 0.0005, lng: centerLng - 0.0005 },
+    'parking_b_road': { lat: centerLat + 0.0007, lng: centerLng - 0.0004 },
     
-    // Hostel area roads
-    'hostel_road_south_1': { lat: 18.059200, lng: 83.405000 },
-    'hostel_road_south_2': { lat: 18.059100, lng: 83.405300 },
-    'hostel_road_south_3': { lat: 18.059000, lng: 83.405500 },
-    'hostel_main_road': { lat: 18.060000, lng: 83.405000 },
-    'hostel_road_north_1': { lat: 18.061000, lng: 83.405000 },
-    'hostel_road_north_2': { lat: 18.061100, lng: 83.405300 },
-    'hostel_road_north_3': { lat: 18.061200, lng: 83.405500 },
-    
-    // Sports and north area
-    'sports_road': { lat: 18.060800, lng: 83.406200 },
-    'sports_junction': { lat: 18.060700, lng: 83.405900 },
-    'north_gate_road': { lat: 18.061300, lng: 83.405300 },
-    'north_gate': { lat: 18.061400, lng: 83.405300 },
-    
-    // Student center area
-    'student_center_road': { lat: 18.060600, lng: 83.405400 },
-    'student_junction': { lat: 18.060500, lng: 83.405300 }
+    // Inner roads
+    'science_lab_road': { lat: centerLat + 0.0004, lng: centerLng + 0.0006 },
+    'garden_path': { lat: centerLat + 0.0002, lng: centerLng + 0.0002 },
+    'fountain_plaza': { lat: centerLat, lng: centerLng - 0.0003 },
+    'cycle_stand': { lat: centerLat - 0.0004, lng: centerLng - 0.0003 },
+    'basketball_court': { lat: centerLat + 0.0005, lng: centerLng + 0.0007 },
+    'football_ground': { lat: centerLat + 0.0008, lng: centerLng + 0.0008 }
   },
 
   // Connections between nodes (bidirectional roads/paths)
   edges: [
-    // Main entrance roads
-    ['main_gate', 'gate_junction'],
-    ['gate_junction', 'parking_junction'],
-    ['parking_junction', 'admin_junction'],
-    ['admin_junction', 'medical_junction'],
-    
-    // Central main road (north-south)
-    ['admin_junction', 'main_road_south'],
-    ['main_road_south', 'central_plaza'],
+    // Main cross roads
     ['central_plaza', 'main_road_north'],
-    ['main_road_north', 'student_center_road'],
+    ['central_plaza', 'main_road_south'],
+    ['central_plaza', 'main_road_east'],
+    ['central_plaza', 'main_road_west'],
+    ['central_plaza', 'garden_path'],
+    ['central_plaza', 'fountain_plaza'],
     
-    // East-west roads through campus
-    ['medical_junction', 'main_road_south'],
-    ['main_road_south', 'cafeteria_junction'],
-    ['cafeteria_junction', 'cafeteria_road'],
+    // North area connections
+    ['main_road_north', 'north_junction'],
+    ['north_junction', 'cs_block_road'],
+    ['cs_block_road', 'science_lab_road'],
+    ['cs_block_road', 'hostel_a_road'],
+    ['hostel_a_road', 'sports_road'],
+    ['hostel_a_road', 'football_ground'],
+    ['sports_road', 'basketball_court'],
+    ['north_junction', 'north_gate'],
+    ['north_junction', 'parking_b_road'],
     
-    ['central_plaza', 'cafeteria_junction'],
-    ['central_plaza', 'eng_road_west'],
-    ['eng_road_west', 'eng_junction'],
-    ['eng_junction', 'eng_road_east'],
-    ['eng_road_east', 'library_junction'],
+    // South area connections
+    ['main_road_south', 'south_junction'],
+    ['south_junction', 'admin_road'],
+    ['south_junction', 'auditorium_road'],
+    ['admin_road', 'main_gate'],
+    ['admin_road', 'cycle_stand'],
+    ['main_gate', 'bus_stop'],
+    ['south_junction', 'medical_road'],
     
-    // Science block roads
-    ['science_junction', 'science_road'],
-    ['science_junction', 'main_road_north'],
-    ['science_junction', 'admin_junction'],
+    // East area connections
+    ['main_road_east', 'east_junction'],
+    ['east_junction', 'cafeteria_road'],
+    ['east_junction', 'garden_path'],
+    ['east_junction', 'basketball_court'],
+    ['cafeteria_road', 'science_lab_road'],
+    ['main_road_east', 'eng_block_a_road'],
+    ['eng_block_a_road', 'workshop_road'],
+    ['eng_block_a_road', 'parking_a_road'],
+    ['parking_a_road', 'hostel_b_road'],
+    ['hostel_b_road', 'main_road_south'],
     
-    // Library and workshop area
-    ['library_junction', 'workshop_road'],
-    ['workshop_road', 'sports_junction'],
-    ['sports_junction', 'sports_road'],
-    
-    // Student center connections
-    ['student_center_road', 'student_junction'],
-    ['student_junction', 'main_road_north'],
-    ['student_junction', 'hostel_road_north_1'],
-    
-    // Hostel area roads (south)
-    ['main_road_south', 'hostel_main_road'],
-    ['hostel_main_road', 'hostel_road_south_1'],
-    ['hostel_road_south_1', 'hostel_road_south_2'],
-    ['hostel_road_south_2', 'hostel_road_south_3'],
-    ['cafeteria_junction', 'hostel_road_south_2'],
-    
-    // Hostel area roads (north)
-    ['hostel_main_road', 'hostel_road_north_1'],
-    ['hostel_road_north_1', 'hostel_road_north_2'],
-    ['hostel_road_north_2', 'hostel_road_north_3'],
-    ['hostel_road_north_2', 'north_gate_road'],
-    ['north_gate_road', 'north_gate'],
-    
-    // Sports complex connections
-    ['hostel_road_north_2', 'sports_junction'],
-    ['student_center_road', 'sports_junction'],
+    // West area connections
+    ['main_road_west', 'west_junction'],
+    ['west_junction', 'library_road'],
+    ['west_junction', 'eng_block_b_road'],
+    ['west_junction', 'fountain_plaza'],
+    ['fountain_plaza', 'medical_road'],
+    ['fountain_plaza', 'cycle_stand'],
+    ['medical_road', 'main_road_south'],
+    ['library_road', 'parking_b_road'],
+    ['eng_block_b_road', 'parking_b_road'],
     
     // Cross connections
-    ['eng_road_west', 'cafeteria_junction'],
-    ['library_junction', 'eng_road_east'],
-    ['sports_junction', 'library_junction']
+    ['garden_path', 'east_junction'],
+    ['science_lab_road', 'sports_road'],
+    ['library_road', 'north_junction'],
+    ['admin_road', 'parking_a_road'],
+    ['workshop_road', 'parking_a_road'],
+    ['basketball_court', 'football_ground']
   ]
 };
 
 // Building to nearest road node mapping
 const buildingToNode = {
   'Main Academic Block': 'central_plaza',
-  'Engineering Block A': 'eng_junction',
-  'Engineering Block B': 'eng_road_west',
-  'Science Block': 'science_road',
-  'Central Library': 'library_junction',
-  'Administration Building': 'admin_junction',
-  'Student Center': 'student_center_road',
-  'Cafeteria & Food Court': 'cafeteria_road',
-  'Boys Hostel Block 1': 'hostel_road_north_1',
-  'Boys Hostel Block 2': 'hostel_road_north_3',
-  'Girls Hostel Block 1': 'hostel_road_south_1',
-  'Girls Hostel Block 2': 'hostel_road_south_3',
+  'Computer Science Block': 'cs_block_road',
+  'Engineering Block A': 'eng_block_a_road',
+  'Engineering Block B': 'eng_block_b_road',
+  'Library Building': 'library_road',
+  'Administration Office': 'admin_road',
+  'Student Center': 'north_junction',
+  'Cafeteria': 'cafeteria_road',
+  'Hostel Block A': 'hostel_a_road',
+  'Hostel Block B': 'hostel_b_road',
+  'Hostel Block C': 'parking_b_road',
   'Sports Complex': 'sports_road',
-  'Auditorium': 'gate_junction',
+  'Auditorium': 'auditorium_road',
+  'Science Lab Block': 'science_lab_road',
   'Workshop Building': 'workshop_road',
+  'Medical Center': 'medical_road',
   'Main Gate': 'main_gate',
   'North Gate': 'north_gate',
-  'Medical Center': 'medical_junction',
-  'Parking Area A': 'parking_junction'
+  'Parking Area A': 'parking_a_road',
+  'Parking Area B': 'parking_b_road'
 };
 
 // Dijkstra's algorithm for shortest path
 function findShortestPath(graph, startNode, endNode) {
+  // If start and end are the same, return single node path
+  if (startNode === endNode) {
+    return [startNode];
+  }
+
   const distances = {};
   const previous = {};
   const unvisited = new Set();
@@ -239,7 +245,7 @@ function findNearestNode(lat, lng) {
 }
 
 function generateWalkablePath(startLat, startLng, endLat, endLng, startBuilding = null, endBuilding = null) {
-  // Try to use building names first
+  // ALWAYS use building names to get proper road nodes - never use raw coordinates
   let startNode = startBuilding && buildingToNode[startBuilding] 
     ? buildingToNode[startBuilding] 
     : findNearestNode(startLat, startLng);
@@ -250,60 +256,55 @@ function generateWalkablePath(startLat, startLng, endLat, endLng, startBuilding 
 
   console.log(`🗺️  Pathfinding: ${startNode} → ${endNode}`);
 
-  // Find path through walkway network
-  const pathNodes = findShortestPath(campusWalkways, startNode, endNode);
-
-  if (!pathNodes || pathNodes.length === 0) {
-    console.log('⚠️  No path found, using direct route');
-    // Fallback to direct path if no route found
+  // If start and end are the same location
+  if (startNode === endNode) {
+    const nodeCoords = campusWalkways.nodes[startNode];
+    console.log('ℹ️  Start and end are at the same location');
     return {
       type: 'Feature',
       geometry: {
         type: 'LineString',
-        coordinates: [
-          [startLng, startLat],
-          [endLng, endLat]
-        ]
+        coordinates: [[nodeCoords.lng, nodeCoords.lat]]
       },
       properties: {
-        distance: Math.round(calculateDistance(startLat, startLng, endLat, endLng)),
-        pathType: 'direct'
+        distance: 0,
+        pathType: 'same_location',
+        directions: ['You are already at the destination']
+      }
+    };
+  }
+
+  // Find path through walkway network - ONLY road nodes
+  const pathNodes = findShortestPath(campusWalkways, startNode, endNode);
+
+  if (!pathNodes || pathNodes.length === 0) {
+    console.log('⚠️  No path found through road network');
+    return {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: []
+      },
+      properties: {
+        distance: 0,
+        pathType: 'no_route',
+        error: 'No walkable route found'
       }
     };
   }
 
   console.log(`✅ Path found with ${pathNodes.length} waypoints:`, pathNodes.join(' → '));
 
-  // Build coordinates array
+  // Build coordinates array - ONLY road node coordinates, NO start/end points
   const coordinates = [];
   
-  // Add start point
-  coordinates.push([startLng, startLat]);
-  
-  // Add first road node if start point is not at the node
-  const firstNodeCoords = campusWalkways.nodes[pathNodes[0]];
-  const distToFirstNode = calculateDistance(startLat, startLng, firstNodeCoords.lat, firstNodeCoords.lng);
-  if (distToFirstNode > 5) { // Only add if more than 5 meters away
-    coordinates.push([firstNodeCoords.lng, firstNodeCoords.lat]);
-  }
-  
-  // Add all intermediate road nodes
-  for (let i = 1; i < pathNodes.length; i++) {
+  // Add ALL road nodes in the path - this ensures we follow roads completely
+  for (let i = 0; i < pathNodes.length; i++) {
     const coords = campusWalkways.nodes[pathNodes[i]];
     coordinates.push([coords.lng, coords.lat]);
   }
-  
-  // Add last road node if end point is not at the node
-  const lastNodeCoords = campusWalkways.nodes[pathNodes[pathNodes.length - 1]];
-  const distToLastNode = calculateDistance(endLat, endLng, lastNodeCoords.lat, lastNodeCoords.lng);
-  if (distToLastNode > 5) { // Only add if more than 5 meters away
-    coordinates.push([lastNodeCoords.lng, lastNodeCoords.lat]);
-  }
-  
-  // Add end point
-  coordinates.push([endLng, endLat]);
 
-  // Calculate total distance
+  // Calculate total distance along roads only
   let totalDistance = 0;
   for (let i = 0; i < coordinates.length - 1; i++) {
     totalDistance += calculateDistance(
@@ -313,6 +314,7 @@ function generateWalkablePath(startLat, startLng, endLat, endLng, startBuilding 
   }
 
   console.log(`📏 Total distance: ${Math.round(totalDistance)}m`);
+  console.log(`🛣️  Route uses ${pathNodes.length} road nodes - NO direct lines`);
 
   // Generate turn-by-turn directions
   const directions = generateDirections(pathNodes);

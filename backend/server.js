@@ -20,6 +20,7 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => console.error('MongoDB connection error:', err));
 
 // Routes
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/buildings', require('./routes/buildings'));
 app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/landmarks', require('./routes/landmarks'));
@@ -29,6 +30,11 @@ app.use('/api', require('./routes/csv'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Mapbox token endpoint
+app.get('/api/mapbox-token', (req, res) => {
+  res.json({ token: process.env.MAPBOX_ACCESS_TOKEN || '' });
 });
 
 const PORT = process.env.PORT || 5000;

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Navigation Demo - Google Maps</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .controls h3 {
+            margin-bottom: 10px;
+            color: #1a73e8;
+            font-size: 18px;
+        }
+
+        .controls select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .controls select:focus {
+            outline: none;
+            border-color: #1a73e8;
+        }
+
+        .controls button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .controls button:hover {
+            background: #1557b0;
+        }
+
+        .controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .navigation-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 90%;
+            display: none;
+        }
+
+        .navigation-panel.active {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .navigation-panel h3 {
+            color: #1a73e8;
+            margin-bottom: 15px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navigation-panel img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .instruction {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .distance {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a73e8;
+            padding: 10px;
+            background: #e8f0fe;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .checkpoint-name {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            z-index: 10;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 14px;
+            color: #666;
+        }
+
+        .status-bar.tracking {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        @media (max-width: 600px) {
+            .controls {
+                top: 10px;
+                padding: 12px 15px;
+            }
+
+            .navigation-panel {
+                bottom: 10px;
+                padding: 15px;
+            }
+
+            .navigation-panel img {
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="controls">
+        <h3>🗺️ Campus Navigation</h3>
+        <select id="destination">
+            <option value="">Select Destination</option>
+            <option value="library">Library</option>
+            <option value="canteen">Canteen</option>
+            <option value="academic_block">Academic Block</option>
+            <option value="sports_complex">Sports Complex</option>
+            <option value="hostel">Hostel Block</option>
+        </select>
+        <button id="startNav" disabled>Start Navigation</button>
+        <button id="clearRoute" style="background: #dc3545; display: none;">Clear Route</button>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+        📍 Detecting location...
+    </div>
+
+    <div class="navigation-panel" id="navPanel">
+        <h3>
+            <span>🚶</span>
+            <span id="waypointName">Next Checkpoint</span>
+        </h3>
+        <img id="waypointImage" src="" alt="Waypoint">
+        <div class="checkpoint-name" id="checkpointName"></div>
+        <div class="instruction" id="instruction"></div>
+        <div class="distance" id="distance">Calculating...</div>
+    </div>
+
+    <script>
+        // Dummy waypoint dataset
+        const waypointData = {
+            library: [
+                {
+                    name: "Main Gate",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/4285f4/ffffff?text=Main+Gate",
+                    instruction: "Start at the main gate and head north"
+                },
+                {
+                    name: "Central Garden",
+                    lat: 18.060170,
+                    lng: 83.405356,
+                    image: "https://via.placeholder.com/400x200/34a853/ffffff?text=Central+Garden",
+                    instruction: "Walk through the central garden"
+                },
+                {
+                    name: "Library",
+                    lat: 18.060370,
+                    lng: 83.404556,
+                    image: "https://via.placeholder.com/400x200/ea4335/ffffff?text=Library",
+                    instruction: "You have arrived at the Library"
+                }
+            ],
+            canteen: [
+                {
+                    name: "Main Gate",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/4285f4/ffffff?text=Main+Gate",
+                    instruction: "Start at the main gate"
+                },
+                {
+                    name: "Canteen",
+                    lat: 18.059970,
+                    lng: 83.405856,
+                    image: "https://via.placeholder.com/400x200/fbbc04/ffffff?text=Canteen",
+                    instruction: "You have arrived at the Canteen"
+                }
+            ],
+            academic_block: [
+                {
+                    name: "Main Gate",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/4285f4/ffffff?text=Main+Gate",
+                    instruction: "Start at the main gate"
+                },
+                {
+                    name: "Central Plaza",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/34a853/ffffff?text=Central+Plaza",
+                    instruction: "Walk through central plaza"
+                },
+                {
+                    name: "Academic Block",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/ea4335/ffffff?text=Academic+Block",
+                    instruction: "You have arrived at the Academic Block"
+                }
+            ],
+            sports_complex: [
+                {
+                    name: "Main Gate",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/4285f4/ffffff?text=Main+Gate",
+                    instruction: "Start at the main gate"
+                },
+                {
+                    name: "Sports Complex",
+                    lat: 18.060570,
+                    lng: 83.405956,
+                    image: "https://via.placeholder.com/400x200/fbbc04/ffffff?text=Sports+Complex",
+                    instruction: "You have arrived at the Sports Complex"
+                }
+            ],
+            hostel: [
+                {
+                    name: "Main Gate",
+                    lat: 18.059970,
+                    lng: 83.405156,
+                    image: "https://via.placeholder.com/400x200/4285f4/ffffff?text=Main+Gate",
+                    instruction: "Start at the main gate"
+                },
+                {
+                    name: "Hostel Block",
+                    lat: 18.060770,
+                    lng: 83.405756,
+                    image: "https://via.placeholder.com/400x200/9c27b0/ffffff?text=Hostel+Block",
+                    instruction: "You have arrived at the Hostel Block"
+                }
+            ]
+        };
+
+        let map;
+        let userMarker;
+        let directionsService;
+        let directionsRenderer;
+        let userLocation;
+        let currentWaypoints = [];
+        let currentWaypointIndex = 0;
+        let waypointMarkers = [];
+        let watchId;
+
+        function initMap() {
+            // Initialize map centered on default location
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 16,
+                center: { lat: 18.059970, lng: 83.405156 },
+                mapTypeControl: true,
+                streetViewControl: false,
+                fullscreenControl: true
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map,
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: '#4285f4',
+                    strokeWeight: 6,
+                    strokeOpacity: 0.8
+                }
+            });
+
+            // Get user location
+            getUserLocation();
+
+            // Event listeners
+            document.getElementById('destination').addEventListener('change', function() {
+                document.getElementById('startNav').disabled = !this.value;
+            });
+
+            document.getElementById('startNav').addEventListener('click', startNavigation);
+            document.getElementById('clearRoute').addEventListener('click', clearRoute);
+        }
+
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+
+                        map.setCenter(userLocation);
+
+                        // Create user marker
+                        userMarker = new google.maps.Marker({
+                            position: userLocation,
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 10,
+                                fillColor: '#4285f4',
+                                fillOpacity: 1,
+                                strokeColor: 'white',
+                                strokeWeight: 3
+                            },
+                            title: 'Your Location'
+                        });
+
+                        document.getElementById('statusBar').textContent = '✅ Location detected';
+                        document.getElementById('statusBar').classList.add('tracking');
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        // Use default campus center
+                        userLocation = { lat: 18.059970, lng: 83.405156 };
+                        map.setCenter(userLocation);
+                        
+                        userMarker = new google.maps.Marker({
+                            position: userLocation,
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 10,
+                                fillColor: '#4285f4',
+                                fillOpacity: 1,
+                                strokeColor: 'white',
+                                strokeWeight: 3
+                            },
+                            title: 'Your Location (Default)'
+                        });
+
+                        document.getElementById('statusBar').textContent = '📍 Using default location';
+                    }
+                );
+            }
+        }
+
+        function startNavigation() {
+            const destination = document.getElementById('destination').value;
+            if (!destination || !userLocation) return;
+
+            currentWaypoints = waypointData[destination];
+            currentWaypointIndex = 0;
+
+            // Get destination coordinates
+            const destCoords = currentWaypoints[currentWaypoints.length - 1];
+
+            // Request directions
+            const request = {
+                origin: userLocation,
+                destination: { lat: destCoords.lat, lng: destCoords.lng },
+                travelMode: google.maps.TravelMode.WALKING
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+                    
+                    // Place waypoint markers
+                    placeWaypointMarkers();
+                    
+                    // Start tracking
+                    startTracking();
+                    
+                    // Show clear button
+                    document.getElementById('clearRoute').style.display = 'block';
+                    document.getElementById('startNav').style.display = 'none';
+                    
+                    document.getElementById('statusBar').textContent = '🚶 Navigation active';
+                } else {
+                    alert('Could not calculate route: ' + status);
+                }
+            });
+        }
+
+        function placeWaypointMarkers() {
+            // Clear existing markers
+            waypointMarkers.forEach(marker => marker.setMap(null));
+            waypointMarkers = [];
+
+            currentWaypoints.forEach((waypoint, index) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: waypoint.lat, lng: waypoint.lng },
+                    map: map,
+                    label: {
+                        text: (index + 1).toString(),
+                        color: 'white',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 15,
+                        fillColor: index === currentWaypoints.length - 1 ? '#ea4335' : '#34a853',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2
+                    },
+                    title: waypoint.name
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 10px;">
+                            <h3 style="margin: 0 0 10px 0; color: #1a73e8;">${waypoint.name}</h3>
+                            <img src="${waypoint.image}" style="width: 200px; height: 100px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;">
+                            <p style="margin: 0; color: #666;">${waypoint.instruction}</p>
+                        </div>
+                    `
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                waypointMarkers.push(marker);
+            });
+        }
+
+        function startTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const newLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Update user marker
+                    if (userMarker) {
+                        userMarker.setPosition(newLocation);
+                    }
+
+                    userLocation = newLocation;
+
+                    // Check distance to next waypoint
+                    checkWaypointProximity();
+                },
+                (error) => {
+                    console.error('Tracking error:', error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 5000
+                }
+            );
+
+            // Also check immediately
+            checkWaypointProximity();
+        }
+
+        function checkWaypointProximity() {
+            if (currentWaypointIndex >= currentWaypoints.length) {
+                return;
+            }
+
+            const waypoint = currentWaypoints[currentWaypointIndex];
+            const distance = calculateDistance(
+                userLocation.lat,
+                userLocation.lng,
+                waypoint.lat,
+                waypoint.lng
+            );
+
+            // If within 30 meters, show navigation panel
+            if (distance <= 30) {
+                showNavigationPanel(waypoint, distance);
+                
+                // Move to next waypoint
+                if (distance <= 10 && currentWaypointIndex < currentWaypoints.length - 1) {
+                    currentWaypointIndex++;
+                }
+            } else {
+                // Hide panel if too far
+                document.getElementById('navPanel').classList.remove('active');
+            }
+        }
+
+        function showNavigationPanel(waypoint, distance) {
+            document.getElementById('waypointName').textContent = waypoint.name;
+            document.getElementById('checkpointName').textContent = `Checkpoint ${currentWaypointIndex + 1} of ${currentWaypoints.length}`;
+            document.getElementById('waypointImage').src = waypoint.image;
+            document.getElementById('instruction').textContent = waypoint.instruction;
+            document.getElementById('distance').textContent = `Distance: ${Math.round(distance)} meters`;
+            document.getElementById('navPanel').classList.add('active');
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth radius in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        function clearRoute() {
+            // Clear directions
+            directionsRenderer.setDirections({ routes: [] });
+            
+            // Clear waypoint markers
+            waypointMarkers.forEach(marker => marker.setMap(null));
+            waypointMarkers = [];
+            
+            // Stop tracking
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            
+            // Hide navigation panel
+            document.getElementById('navPanel').classList.remove('active');
+            
+            // Reset UI
+            document.getElementById('destination').value = '';
+            document.getElementById('startNav').disabled = true;
+            document.getElementById('startNav').style.display = 'block';
+            document.getElementById('clearRoute').style.display = 'none';
+            document.getElementById('statusBar').textContent = '✅ Location detected';
+            
+            currentWaypoints = [];
+            currentWaypointIndex = 0;
+        }
+
+        // Initialize map when page loads
+        window.initMap = initMap;
+    </script>
+
+    <!-- Load Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap" async defer></script>
+</body>
+</html>

@@ -4,137 +4,185 @@ const Building = require('./models/Building');
 const Room = require('./models/Room');
 const Landmark = require('./models/Landmark');
 
-// Base coordinates: 18.060005, 83.405167
-// Creating realistic campus layout within ~500m radius
+// Base coordinates: 18.05997021737144, 83.40515640049136
+// Creating realistic campus layout within 100m radius
+// 1 degree latitude ≈ 111km, so 100m ≈ 0.0009 degrees
+// 1 degree longitude ≈ 111km * cos(latitude), so 100m ≈ 0.0009 degrees
+
+const centerLat = 18.05997021737144;
+const centerLng = 83.40515640049136;
 
 const buildings = [
   {
     name: 'Main Academic Block',
-    coordinates: { lat: 18.060005, lng: 83.405167 },
-    description: 'Central academic building with lecture halls and laboratories'
+    coordinates: { lat: centerLat, lng: centerLng },
+    description: 'Central academic building with lecture halls and laboratories',
+    image: 'https://picsum.photos/seed/academic-main/600/400'
+  },
+  {
+    name: 'Computer Science Block',
+    coordinates: { lat: centerLat + 0.0006, lng: centerLng + 0.0004 },
+    description: 'Computer labs and CS department offices',
+    image: 'https://picsum.photos/seed/cs-block/600/400'
   },
   {
     name: 'Engineering Block A',
-    coordinates: { lat: 18.060450, lng: 83.405800 },
-    description: 'Computer Science and Electronics departments'
+    coordinates: { lat: centerLat - 0.0004, lng: centerLng + 0.0006 },
+    description: 'Mechanical and Electronics Engineering departments',
+    image: 'https://picsum.photos/seed/eng-block-a/600/400'
   },
   {
     name: 'Engineering Block B',
-    coordinates: { lat: 18.059550, lng: 83.405800 },
-    description: 'Mechanical and Civil Engineering departments'
+    coordinates: { lat: centerLat + 0.0005, lng: centerLng - 0.0005 },
+    description: 'Civil and Electrical Engineering departments',
+    image: 'https://picsum.photos/seed/eng-block-b/600/400'
   },
   {
-    name: 'Science Block',
-    coordinates: { lat: 18.060450, lng: 83.404500 },
-    description: 'Physics, Chemistry, and Biology laboratories'
+    name: 'Library Building',
+    coordinates: { lat: centerLat + 0.0004, lng: centerLng - 0.0006 },
+    description: 'Central library with digital resources',
+    image: 'https://picsum.photos/seed/library/600/400'
   },
   {
-    name: 'Central Library',
-    coordinates: { lat: 18.060200, lng: 83.405900 },
-    description: 'Three-floor library with digital resources and study areas'
-  },
-  {
-    name: 'Administration Building',
-    coordinates: { lat: 18.059700, lng: 83.404800 },
-    description: 'Administrative offices, registrar, and accounts department'
+    name: 'Administration Office',
+    coordinates: { lat: centerLat - 0.0006, lng: centerLng - 0.0004 },
+    description: 'Administrative offices and registrar',
+    image: 'https://picsum.photos/seed/admin/600/400'
   },
   {
     name: 'Student Center',
-    coordinates: { lat: 18.060600, lng: 83.405400 },
-    description: 'Student activities, clubs, and recreation facilities'
+    coordinates: { lat: centerLat + 0.0007, lng: centerLng },
+    description: 'Student activities and recreation',
+    image: 'https://picsum.photos/seed/student-center/600/400'
   },
   {
-    name: 'Cafeteria & Food Court',
-    coordinates: { lat: 18.059800, lng: 83.405500 },
-    description: 'Main dining hall with multiple food outlets'
+    name: 'Cafeteria',
+    coordinates: { lat: centerLat, lng: centerLng + 0.0007 },
+    description: 'Main dining hall and food court',
+    image: 'https://picsum.photos/seed/cafeteria/600/400'
   },
   {
-    name: 'Boys Hostel Block 1',
-    coordinates: { lat: 18.061000, lng: 83.405000 },
-    description: 'Residential accommodation for male students'
+    name: 'Hostel Block A',
+    coordinates: { lat: centerLat + 0.0008, lng: centerLng + 0.0006 },
+    description: 'Student residential accommodation',
+    image: 'https://picsum.photos/seed/hostel-a/600/400'
   },
   {
-    name: 'Boys Hostel Block 2',
-    coordinates: { lat: 18.061200, lng: 83.405500 },
-    description: 'Additional residential accommodation for male students'
+    name: 'Hostel Block B',
+    coordinates: { lat: centerLat - 0.0008, lng: centerLng + 0.0004 },
+    description: 'Student residential accommodation',
+    image: 'https://picsum.photos/seed/hostel-b/600/400'
   },
   {
-    name: 'Girls Hostel Block 1',
-    coordinates: { lat: 18.059200, lng: 83.405000 },
-    description: 'Residential accommodation for female students'
-  },
-  {
-    name: 'Girls Hostel Block 2',
-    coordinates: { lat: 18.059000, lng: 83.405500 },
-    description: 'Additional residential accommodation for female students'
+    name: 'Hostel Block C',
+    coordinates: { lat: centerLat + 0.0006, lng: centerLng - 0.0007 },
+    description: 'Student residential accommodation',
+    image: 'https://picsum.photos/seed/hostel-c/600/400'
   },
   {
     name: 'Sports Complex',
-    coordinates: { lat: 18.060800, lng: 83.406200 },
-    description: 'Indoor sports facilities including gymnasium and courts'
+    coordinates: { lat: centerLat + 0.0006, lng: centerLng + 0.0008 },
+    description: 'Indoor sports facilities and gymnasium',
+    image: 'https://picsum.photos/seed/sports/600/400'
   },
   {
     name: 'Auditorium',
-    coordinates: { lat: 18.059500, lng: 83.404400 },
-    description: 'Main auditorium with 500-seat capacity for events'
+    coordinates: { lat: centerLat - 0.0007, lng: centerLng },
+    description: 'Main auditorium for events and seminars',
+    image: 'https://picsum.photos/seed/auditorium/600/400'
+  },
+  {
+    name: 'Science Lab Block',
+    coordinates: { lat: centerLat + 0.0004, lng: centerLng + 0.0006 },
+    description: 'Physics, Chemistry, and Biology laboratories',
+    image: 'https://picsum.photos/seed/science-lab/600/400'
   },
   {
     name: 'Workshop Building',
-    coordinates: { lat: 18.060300, lng: 83.406000 },
-    description: 'Engineering workshops and practical training facilities'
+    coordinates: { lat: centerLat - 0.0005, lng: centerLng + 0.0007 },
+    description: 'Engineering workshops and practical training',
+    image: 'https://picsum.photos/seed/workshop/600/400'
+  },
+  {
+    name: 'Medical Center',
+    coordinates: { lat: centerLat - 0.0002, lng: centerLng - 0.0006 },
+    description: 'Campus health center with medical facilities',
+    image: 'https://picsum.photos/seed/medical/600/400'
   }
 ];
 
 const landmarks = [
   {
     name: 'Main Gate',
-    coordinates: { lat: 18.059400, lng: 83.404200 },
-    description: 'Primary entrance to campus with security checkpoint'
+    coordinates: { lat: centerLat - 0.0009, lng: centerLng - 0.0006 },
+    description: 'Primary entrance to campus',
+    image: 'https://picsum.photos/seed/main-gate/600/400'
   },
   {
     name: 'North Gate',
-    coordinates: { lat: 18.061400, lng: 83.405300 },
-    description: 'Secondary entrance near hostel blocks'
+    coordinates: { lat: centerLat + 0.0009, lng: centerLng + 0.0003 },
+    description: 'Secondary entrance near hostels',
+    image: 'https://picsum.photos/seed/north-gate/600/400'
   },
   {
     name: 'Central Garden',
-    coordinates: { lat: 18.060100, lng: 83.405300 },
-    description: 'Beautiful landscaped garden with seating areas'
+    coordinates: { lat: centerLat + 0.0002, lng: centerLng + 0.0002 },
+    description: 'Landscaped garden with seating',
+    image: 'https://picsum.photos/seed/garden/600/400'
   },
   {
     name: 'Parking Area A',
-    coordinates: { lat: 18.059600, lng: 83.404600 },
-    description: 'Main parking facility for students and staff'
+    coordinates: { lat: centerLat - 0.0006, lng: centerLng + 0.0007 },
+    description: 'Main parking facility',
+    image: 'https://picsum.photos/seed/parking-a/600/400'
   },
   {
     name: 'Parking Area B',
-    coordinates: { lat: 18.060700, lng: 83.405700 },
-    description: 'Additional parking near academic blocks'
-  },
-  {
-    name: 'Medical Center',
-    coordinates: { lat: 18.059900, lng: 83.404700 },
-    description: 'Campus health center with first aid and medical services'
+    coordinates: { lat: centerLat + 0.0007, lng: centerLng - 0.0004 },
+    description: 'Additional parking near academic blocks',
+    image: 'https://picsum.photos/seed/parking-b/600/400'
   },
   {
     name: 'ATM & Bank',
-    coordinates: { lat: 18.060000, lng: 83.405000 },
-    description: 'Banking services and ATM facilities'
+    coordinates: { lat: centerLat + 0.0003, lng: centerLng - 0.0004 },
+    description: 'Banking services and ATM',
+    image: 'https://picsum.photos/seed/atm-bank/600/400'
   },
   {
     name: 'Stationary Shop',
-    coordinates: { lat: 18.059850, lng: 83.405200 },
-    description: 'Books, stationery, and academic supplies'
+    coordinates: { lat: centerLat - 0.0003, lng: centerLng + 0.0004 },
+    description: 'Books and stationery supplies',
+    image: 'https://picsum.photos/seed/stationary/600/400'
   },
   {
     name: 'Basketball Court',
-    coordinates: { lat: 18.060900, lng: 83.406000 },
-    description: 'Outdoor basketball court'
+    coordinates: { lat: centerLat + 0.0005, lng: centerLng + 0.0007 },
+    description: 'Outdoor basketball court',
+    image: 'https://picsum.photos/seed/basketball/600/400'
   },
   {
     name: 'Football Ground',
-    coordinates: { lat: 18.061100, lng: 83.406400 },
-    description: 'Full-size football field with running track'
+    coordinates: { lat: centerLat + 0.0008, lng: centerLng + 0.0008 },
+    description: 'Full-size football field',
+    image: 'https://picsum.photos/seed/football/600/400'
+  },
+  {
+    name: 'Fountain Plaza',
+    coordinates: { lat: centerLat, lng: centerLng - 0.0003 },
+    description: 'Central fountain and meeting point',
+    image: 'https://picsum.photos/seed/fountain/600/400'
+  },
+  {
+    name: 'Cycle Stand',
+    coordinates: { lat: centerLat - 0.0004, lng: centerLng - 0.0003 },
+    description: 'Bicycle parking area',
+    image: 'https://picsum.photos/seed/cycle-stand/600/400'
+  },
+  {
+    name: 'Bus Stop',
+    coordinates: { lat: centerLat - 0.0008, lng: centerLng - 0.0005 },
+    description: 'Campus bus stop',
+    image: 'https://picsum.photos/seed/bus-stop/600/400'
   }
 ];
 
@@ -165,41 +213,42 @@ async function seedDatabase() {
     console.log('\n🚪 Inserting rooms...');
     
     const mainAcademic = insertedBuildings.find(b => b.name === 'Main Academic Block');
+    const csBlock = insertedBuildings.find(b => b.name === 'Computer Science Block');
     const engBlockA = insertedBuildings.find(b => b.name === 'Engineering Block A');
     const engBlockB = insertedBuildings.find(b => b.name === 'Engineering Block B');
-    const scienceBlock = insertedBuildings.find(b => b.name === 'Science Block');
+    const scienceBlock = insertedBuildings.find(b => b.name === 'Science Lab Block');
 
     const rooms = [
       // Main Academic Block
-      { roomNumber: '101', buildingId: mainAcademic._id, floor: 1, department: 'General', coordinates: { lat: 18.060020, lng: 83.405180 } },
-      { roomNumber: '102', buildingId: mainAcademic._id, floor: 1, department: 'General', coordinates: { lat: 18.060030, lng: 83.405190 } },
-      { roomNumber: '103', buildingId: mainAcademic._id, floor: 1, department: 'General', coordinates: { lat: 18.060040, lng: 83.405200 } },
-      { roomNumber: '201', buildingId: mainAcademic._id, floor: 2, department: 'General', coordinates: { lat: 18.060020, lng: 83.405180 } },
-      { roomNumber: '202', buildingId: mainAcademic._id, floor: 2, department: 'General', coordinates: { lat: 18.060030, lng: 83.405190 } },
-      { roomNumber: '301', buildingId: mainAcademic._id, floor: 3, department: 'General', coordinates: { lat: 18.060020, lng: 83.405180 } },
+      { roomNumber: '101', buildingId: mainAcademic._id, floor: 1, department: 'General', coordinates: { lat: centerLat + 0.00002, lng: centerLng + 0.00002 } },
+      { roomNumber: '102', buildingId: mainAcademic._id, floor: 1, department: 'General', coordinates: { lat: centerLat + 0.00003, lng: centerLng + 0.00003 } },
+      { roomNumber: '201', buildingId: mainAcademic._id, floor: 2, department: 'General', coordinates: { lat: centerLat + 0.00002, lng: centerLng + 0.00002 } },
+      { roomNumber: '202', buildingId: mainAcademic._id, floor: 2, department: 'General', coordinates: { lat: centerLat + 0.00003, lng: centerLng + 0.00003 } },
+      { roomNumber: '301', buildingId: mainAcademic._id, floor: 3, department: 'General', coordinates: { lat: centerLat + 0.00002, lng: centerLng + 0.00002 } },
+      
+      // Computer Science Block
+      { roomNumber: 'CS101', buildingId: csBlock._id, floor: 1, department: 'Computer Science', coordinates: { lat: centerLat + 0.0006, lng: centerLng + 0.00042 } },
+      { roomNumber: 'CS102', buildingId: csBlock._id, floor: 1, department: 'Computer Lab', coordinates: { lat: centerLat + 0.00061, lng: centerLng + 0.00043 } },
+      { roomNumber: 'CS201', buildingId: csBlock._id, floor: 2, department: 'Computer Science', coordinates: { lat: centerLat + 0.0006, lng: centerLng + 0.00042 } },
+      { roomNumber: 'CS202', buildingId: csBlock._id, floor: 2, department: 'AI Lab', coordinates: { lat: centerLat + 0.00061, lng: centerLng + 0.00043 } },
       
       // Engineering Block A
-      { roomNumber: 'A101', buildingId: engBlockA._id, floor: 1, department: 'Computer Science', coordinates: { lat: 18.060460, lng: 83.405820 } },
-      { roomNumber: 'A102', buildingId: engBlockA._id, floor: 1, department: 'Computer Science', coordinates: { lat: 18.060470, lng: 83.405830 } },
-      { roomNumber: 'A103', buildingId: engBlockA._id, floor: 1, department: 'Computer Lab', coordinates: { lat: 18.060480, lng: 83.405840 } },
-      { roomNumber: 'A201', buildingId: engBlockA._id, floor: 2, department: 'Electronics', coordinates: { lat: 18.060460, lng: 83.405820 } },
-      { roomNumber: 'A202', buildingId: engBlockA._id, floor: 2, department: 'Electronics', coordinates: { lat: 18.060470, lng: 83.405830 } },
-      { roomNumber: 'A203', buildingId: engBlockA._id, floor: 2, department: 'Electronics Lab', coordinates: { lat: 18.060480, lng: 83.405840 } },
+      { roomNumber: 'EA101', buildingId: engBlockA._id, floor: 1, department: 'Mechanical', coordinates: { lat: centerLat - 0.00039, lng: centerLng + 0.0006 } },
+      { roomNumber: 'EA102', buildingId: engBlockA._id, floor: 1, department: 'Electronics', coordinates: { lat: centerLat - 0.0004, lng: centerLng + 0.00061 } },
+      { roomNumber: 'EA201', buildingId: engBlockA._id, floor: 2, department: 'Mechanical', coordinates: { lat: centerLat - 0.00039, lng: centerLng + 0.0006 } },
+      { roomNumber: 'EA202', buildingId: engBlockA._id, floor: 2, department: 'Electronics Lab', coordinates: { lat: centerLat - 0.0004, lng: centerLng + 0.00061 } },
       
       // Engineering Block B
-      { roomNumber: 'B101', buildingId: engBlockB._id, floor: 1, department: 'Mechanical', coordinates: { lat: 18.059560, lng: 83.405820 } },
-      { roomNumber: 'B102', buildingId: engBlockB._id, floor: 1, department: 'Mechanical', coordinates: { lat: 18.059570, lng: 83.405830 } },
-      { roomNumber: 'B103', buildingId: engBlockB._id, floor: 1, department: 'Workshop', coordinates: { lat: 18.059580, lng: 83.405840 } },
-      { roomNumber: 'B201', buildingId: engBlockB._id, floor: 2, department: 'Civil', coordinates: { lat: 18.059560, lng: 83.405820 } },
-      { roomNumber: 'B202', buildingId: engBlockB._id, floor: 2, department: 'Civil', coordinates: { lat: 18.059570, lng: 83.405830 } },
+      { roomNumber: 'EB101', buildingId: engBlockB._id, floor: 1, department: 'Civil', coordinates: { lat: centerLat + 0.00051, lng: centerLng - 0.0005 } },
+      { roomNumber: 'EB102', buildingId: engBlockB._id, floor: 1, department: 'Electrical', coordinates: { lat: centerLat + 0.00052, lng: centerLng - 0.00049 } },
+      { roomNumber: 'EB201', buildingId: engBlockB._id, floor: 2, department: 'Civil', coordinates: { lat: centerLat + 0.00051, lng: centerLng - 0.0005 } },
+      { roomNumber: 'EB202', buildingId: engBlockB._id, floor: 2, department: 'Electrical Lab', coordinates: { lat: centerLat + 0.00052, lng: centerLng - 0.00049 } },
       
-      // Science Block
-      { roomNumber: 'S101', buildingId: scienceBlock._id, floor: 1, department: 'Physics', coordinates: { lat: 18.060460, lng: 83.404520 } },
-      { roomNumber: 'S102', buildingId: scienceBlock._id, floor: 1, department: 'Physics Lab', coordinates: { lat: 18.060470, lng: 83.404530 } },
-      { roomNumber: 'S201', buildingId: scienceBlock._id, floor: 2, department: 'Chemistry', coordinates: { lat: 18.060460, lng: 83.404520 } },
-      { roomNumber: 'S202', buildingId: scienceBlock._id, floor: 2, department: 'Chemistry Lab', coordinates: { lat: 18.060470, lng: 83.404530 } },
-      { roomNumber: 'S301', buildingId: scienceBlock._id, floor: 3, department: 'Biology', coordinates: { lat: 18.060460, lng: 83.404520 } },
-      { roomNumber: 'S302', buildingId: scienceBlock._id, floor: 3, department: 'Biology Lab', coordinates: { lat: 18.060470, lng: 83.404530 } }
+      // Science Lab Block
+      { roomNumber: 'S101', buildingId: scienceBlock._id, floor: 1, department: 'Physics', coordinates: { lat: centerLat + 0.00041, lng: centerLng + 0.0006 } },
+      { roomNumber: 'S102', buildingId: scienceBlock._id, floor: 1, department: 'Chemistry', coordinates: { lat: centerLat + 0.00042, lng: centerLng + 0.00061 } },
+      { roomNumber: 'S201', buildingId: scienceBlock._id, floor: 2, department: 'Biology', coordinates: { lat: centerLat + 0.00041, lng: centerLng + 0.0006 } },
+      { roomNumber: 'S202', buildingId: scienceBlock._id, floor: 2, department: 'Chemistry Lab', coordinates: { lat: centerLat + 0.00042, lng: centerLng + 0.00061 } }
     ];
 
     const insertedRooms = await Room.insertMany(rooms);
@@ -211,8 +260,8 @@ async function seedDatabase() {
     console.log(`   Rooms: ${insertedRooms.length}`);
     console.log(`   Landmarks: ${insertedLandmarks.length}`);
     console.log(`   Total: ${insertedBuildings.length + insertedRooms.length + insertedLandmarks.length} records`);
-    console.log('\n📍 Campus Center: 18.060005, 83.405167');
-    console.log('🗺️  Coverage: ~500m radius');
+    console.log(`\n📍 Campus Center: ${centerLat}, ${centerLng}`);
+    console.log('🗺️  Coverage: 100m radius');
 
     process.exit(0);
   } catch (error) {
