@@ -9,12 +9,18 @@ import FloatingActionButtons from '../components/FloatingActionButtons';
 import LocationPicker from '../components/LocationPicker';
 import WaypointGallery from '../components/WaypointGallery';
 import ProfileSidebar from '../components/ProfileSidebar';
+import StreetViewPanel from '../components/StreetViewPanel';
+import MapLegend from '../components/MapLegend';
+import TriggerBanner from '../components/TriggerBanner';
+import AdminDashboard from '../components/AdminDashboard';
+import { ToastContainer, useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Building2, DoorOpen, MapPin, Loader2 } from 'lucide-react';
+import { Building2, DoorOpen, MapPin, Loader2, Bell } from 'lucide-react';
 
 function Home() {
   const { user } = useAuth();
+  const { toasts, addToast, removeToast } = useToast();
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [landmarks, setLandmarks] = useState([]);
@@ -28,9 +34,12 @@ function Home() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [isSelectingLocationOnMap, setIsSelectingLocationOnMap] = useState(false);
   const [showWaypointGallery, setShowWaypointGallery] = useState(false);
   const [waypointImages, setWaypointImages] = useState([]);
   const [showProfileSidebar, setShowProfileSidebar] = useState(false);
+  const [showStreetView, setShowStreetView] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -164,6 +173,20 @@ function Home() {
     setShowLocationPicker(true);
   };
 
+  const handleSelectOnMap = () => {
+    // Enable map selection mode
+    setShowLocationPicker(false);
+    setIsSelectingLocationOnMap(true);
+  };
+
+  const handleMapClick = (coords) => {
+    setUserLocation(coords);
+    // Automatically calculate route if a destination is selected
+    if (selectedLocation) {
+      handleNavigate();
+    }
+  };
+
   const handleLayersToggle = () => {
     setShowLayerPanel(!showLayerPanel);
   };
@@ -195,6 +218,7 @@ function Home() {
       <TopNavBar 
         campusName="Campus Navigator" 
         onMenuClick={() => setShowProfileSidebar(true)}
+        onAdminClick={() => user?.role === 'admin' || user?.role === 'teacher' ? setShowAdminDashboard(true) : addToast('Admin access required', 'error')}
       />
       
       <MapView
@@ -206,6 +230,9 @@ function Home() {
         route={route}
         showLayerPanel={showLayerPanel}
         onLayerChange={() => setShowLayerPanel(false)}
+        onMapClick={handleMapClick}
+        isSelectingLocation={isSelectingLocationOnMap}
+        onSelectionComplete={() => setIsSelectingLocationOnMap(false)}
       />
       
       <SearchBar
@@ -217,6 +244,15 @@ function Home() {
         onLocate={handleLocate}
         onLayersToggle={handleLayersToggle}
       />
+
+      {/* Trigger Banner - Top Center */}
+      <motion.div
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-2xl px-4"
+      >
+        <TriggerBanner />
+      </motion.div>
 
       <AnimatePresence>
         {showDrawer && selectedItem && (
@@ -233,6 +269,7 @@ function Home() {
         isOpen={showLocationPicker}
         onClose={() => setShowLocationPicker(false)}
         onSelectLocation={handleSelectUserLocation}
+        onSelectOnMap={handleSelectOnMap}
       />
 
       {!showDrawer && selectedLocation && (
@@ -257,6 +294,19 @@ function Home() {
         </motion.button>
       )}
 
+      {/* Street View Button */}
+      {route && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          onClick={() => setShowStreetView(true)}
+          className="absolute bottom-40 left-4 z-20 bg-purple-600 text-white px-4 py-3 rounded-xl shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-2 font-medium"
+        >
+          <MapPin className="w-5 h-5" />
+          <span>View Street View</span>
+        </motion.button>
+      )}
+
       {/* Waypoint Gallery Modal */}
       {showWaypointGallery && (
         <WaypointGallery
@@ -271,38 +321,8 @@ function Home() {
         onClose={() => setShowProfileSidebar(false)}
       />
 
-      {/* Legend */}
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="absolute top-24 right-4 z-10 glass-effect rounded-xl shadow-lg p-4 hidden md:block"
-      >
-        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Map Legend</h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-xs">
-              🏢
-            </div>
-            <span className="text-sm text-gray-700">Buildings</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-green-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-xs">
-              🚪
-            </div>
-            <span className="text-sm text-gray-700">Rooms</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-amber-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-xs">
-              📍
-            </div>
-            <span className="text-sm text-gray-700">Landmarks</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-600 rounded-full border-2 border-white shadow-sm pulse-marker"></div>
-            <span className="text-sm text-gray-700">Your Location</span>
-          </div>
-        </div>
-      </motion.div>
+      {/* Movable Map Legend */}
+      <MapLegend />
 
       {/* Location Status Indicator */}
       {userLocation && (
@@ -315,6 +335,25 @@ function Home() {
           <span className="text-xs font-medium text-gray-700">Location Set</span>
         </motion.div>
       )}
+
+      {/* Street View Panel */}
+      <StreetViewPanel
+        isOpen={showStreetView}
+        onClose={() => setShowStreetView(false)}
+        route={route}
+        startLocation={userLocation}
+        endLocation={selectedLocation}
+      />
+
+      {/* Admin Dashboard Modal */}
+      <AnimatePresence>
+        {showAdminDashboard && (
+          <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

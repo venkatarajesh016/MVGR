@@ -106,5 +106,21 @@ export const api = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
+  },
+
+  // Timetable
+  getTimetable: async () => {
+    const response = await axios.get(`${API_BASE_URL}/timetable`);
+    return response.data.timetable;
+  },
+
+  updateTimetable: async (timetableData) => {
+    const response = await axios.put(`${API_BASE_URL}/timetable`, timetableData);
+    return response.data;
+  },
+
+  createTimetable: async (timetableData) => {
+    const response = await axios.post(`${API_BASE_URL}/timetable`, timetableData);
+    return response.data;
   }
 };

@@ -3,7 +3,7 @@ const router = express.Router();
 const Building = require('../models/Building');
 const Room = require('../models/Room');
 const Landmark = require('../models/Landmark');
-const { getOSRMRoute, getGraphHopperRoute } = require('../utils/graphhopper');
+const { getOSRMRoute } = require('../utils/graphhopper');
 
 // Search endpoint
 router.get('/search', async (req, res) => {
@@ -37,7 +37,7 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get walkable route between two points using OpenStreetMap
+// Get walkable route between two points using OpenStreetMap (OSRM)
 router.get('/route', async (req, res) => {
   try {
     const { startLat, startLng, endLat, endLng } = req.query;
@@ -74,27 +74,24 @@ router.get('/route', async (req, res) => {
       });
     }
 
-    // Try OSRM first (OpenStreetMap - free, no API key needed)
-    let route = await getOSRMRoute(start.lat, start.lng, end.lat, end.lng, 'foot');
-
-    // Fallback to GraphHopper if OSRM fails
-    if (!route) {
-      console.log('🔄 OSRM failed, trying GraphHopper...');
-      route = await getGraphHopperRoute(start.lat, start.lng, end.lat, end.lng, 'foot');
-    }
+    // Use OSRM (OpenStreetMap Routing Machine) - no API key needed
+    console.log(`🗺️  Finding route from (${start.lat}, ${start.lng}) to (${end.lat}, ${end.lng})`);
+    const route = await getOSRMRoute(start.lat, start.lng, end.lat, end.lng, 'foot');
 
     if (!route) {
       return res.status(500).json({
-        message: 'Unable to calculate route. Please try again.',
-        error: 'No routing service available'
+        message: 'Unable to calculate route. Please check your coordinates and try again.',
+        error: 'OSRM routing service unavailable'
       });
     }
 
-    // Get images of buildings/landmarks along the route
+    console.log(`✅ Route found: ${route.properties.distance}m, ${route.properties.time} minutes`);
+
+    // Get images of buildings/landmarks near the route
     if (route && route.properties) {
       const waypointImages = await getWaypointImages(start, end);
       route.properties.waypointImages = waypointImages;
-      console.log(`📸 Found ${waypointImages.length} images along the route`);
+      console.log(`📸 Found ${waypointImages.length} nearby locations`);
     }
 
     res.json(route);
@@ -133,7 +130,7 @@ async function getWaypointImages(startPoint, endPoint) {
       }))
     ];
 
-    // Find locations near the route (within 50m of start/end or between them)
+    // Find locations near the route (within 100m of start or end)
     const nearbyLocations = allLocations.filter(loc => {
       const distToStart = calculateDistance(startPoint.lat, startPoint.lng, loc.lat, loc.lng);
       const distToEnd = calculateDistance(endPoint.lat, endPoint.lng, loc.lat, loc.lng);

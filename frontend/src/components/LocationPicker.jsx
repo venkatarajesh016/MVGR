@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, X, Navigation } from 'lucide-react';
+import { MapPin, X, Navigation, Map } from 'lucide-react';
 
-function LocationPicker({ isOpen, onClose, onSelectLocation }) {
+function LocationPicker({ isOpen, onClose, onSelectLocation, onSelectOnMap }) {
+  const [selectedCoords, setSelectedCoords] = useState(null);
+  
   const commonLocations = [
     { name: 'Main Gate', lat: 18.05997021737144 - 0.00045, lng: 83.40515640049136 - 0.0003 },
     { name: 'Main Academic Block', lat: 18.05997021737144, lng: 83.40515640049136 },
@@ -10,6 +12,19 @@ function LocationPicker({ isOpen, onClose, onSelectLocation }) {
     { name: 'Cafeteria', lat: 18.05997021737144, lng: 83.40515640049136 + 0.00035 },
     { name: 'Sports Complex', lat: 18.05997021737144 + 0.0003, lng: 83.40515640049136 + 0.0004 }
   ];
+
+  const handleSelectOnMap = () => {
+    if (onSelectOnMap) {
+      onSelectOnMap();
+      onClose();
+    }
+  };
+
+  const handleLocationSelected = (location) => {
+    setSelectedCoords(location);
+    onSelectLocation(location);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -45,7 +60,7 @@ function LocationPicker({ isOpen, onClose, onSelectLocation }) {
 
         <div className="overflow-y-auto max-h-[calc(70vh-80px)] p-6">
           <p className="text-sm text-gray-600 mb-4">
-            Choose your current location or allow browser location access
+            Choose your location or select manually on the map
           </p>
 
           <motion.button
@@ -55,22 +70,31 @@ function LocationPicker({ isOpen, onClose, onSelectLocation }) {
               if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                   (position) => {
-                    onSelectLocation({
+                    handleLocationSelected({
                       lat: position.coords.latitude,
                       lng: position.coords.longitude
                     });
-                    onClose();
                   },
-                  (error) => {
+                  () => {
                     alert('Unable to get your location. Please select manually.');
                   }
                 );
               }
             }}
-            className="w-full mb-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
+            className="w-full mb-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
           >
             <Navigation className="w-5 h-5" />
             Use My Current Location
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleSelectOnMap}
+            className="w-full mb-4 bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
+          >
+            <Map className="w-5 h-5" />
+            Select Location on Map
           </motion.button>
 
           <div className="mb-3">
@@ -84,10 +108,7 @@ function LocationPicker({ isOpen, onClose, onSelectLocation }) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                onClick={() => {
-                  onSelectLocation(location);
-                  onClose();
-                }}
+                onClick={() => handleLocationSelected(location)}
                 className="w-full p-4 bg-gray-50 hover:bg-blue-50 rounded-xl transition-colors text-left flex items-center gap-3 group"
               >
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">

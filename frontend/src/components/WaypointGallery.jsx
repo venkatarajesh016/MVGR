@@ -58,36 +58,6 @@ function WaypointGallery({ waypointImages, onClose }) {
                     </div>
                   </div>
 
-                  {/* Image */}
-                  <div className="flex-shrink-0">
-                    <img
-                      src={waypoint.image}
-                      alt={waypoint.name}
-                      className="w-32 h-32 object-cover rounded-lg shadow-md"
-                      crossOrigin="anonymous"
-                      onError={(e) => {
-                        // Try multiple fallbacks
-                        if (!e.target.dataset.retried) {
-                          e.target.dataset.retried = 'true';
-                          e.target.src = `https://picsum.photos/seed/${encodeURIComponent(waypoint.name)}/400/300`;
-                        } else if (!e.target.dataset.retriedTwice) {
-                          e.target.dataset.retriedTwice = 'true';
-                          e.target.src = `https://placehold.co/400x300/4285f4/white?text=${encodeURIComponent(waypoint.name)}`;
-                        } else {
-                          // Final fallback: colored div
-                          e.target.style.display = 'none';
-                          const parent = e.target.parentElement;
-                          if (!parent.querySelector('.fallback-image')) {
-                            const fallback = document.createElement('div');
-                            fallback.className = 'fallback-image w-32 h-32 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg shadow-md flex items-center justify-center text-white text-xs font-bold text-center p-2';
-                            fallback.textContent = waypoint.name;
-                            parent.appendChild(fallback);
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-
                   {/* Details */}
                   <div className="flex-1 flex flex-col justify-center">
                     <h3 className="text-lg font-bold text-gray-900 mb-1">

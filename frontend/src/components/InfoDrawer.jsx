@@ -69,16 +69,6 @@ function InfoDrawer({ item, type, onClose, onNavigate }) {
         </div>
 
         <div className="overflow-y-auto max-h-[calc(80vh-80px)]">
-          {item.image && (
-            <div className="relative h-56 overflow-hidden">
-              <img
-                src={item.image}
-                alt={getName()}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-
           <div className="p-6 space-y-6">
             {getDetails()}
 

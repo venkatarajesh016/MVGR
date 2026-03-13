@@ -11,12 +11,15 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "leaflet": "^1.9.4",
+    "leaflet-routing-machine": "^3.2.12",
     "react-leaflet": "^4.2.1",
     "axios": "^1.6.0",
     "framer-motion": "^10.16.4",
     "lucide-react": "^0.294.0",
     "react-router-dom": "^6.20.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "socket.io-client": "^4.7.2",
+    "zustand": "^4.4.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import 'leaflet-routing-machine';
 
 // Fix Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -11,11 +13,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, route, showLayerPanel, onLayerChange }) {
+function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, route, showLayerPanel, onLayerChange, onMapClick, isSelectingLocation, onSelectionComplete }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]);
   const routeLayerRef = useRef(null);
+  const routingControlRef = useRef(null);
+  const selectedMarkerRef = useRef(null);
   const [currentLayer, setCurrentLayer] = useState('osm');
   const [mapReady, setMapReady] = useState(false);
 
@@ -59,7 +63,7 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
     // Add initial tile layer
     L.tileLayer(mapLayers.osm.url, {
       attribution: mapLayers.osm.attribution,
-      maxZoom: 20,
+      maxZoom: 19,
       minZoom: 14
     }).addTo(map.current);
 
@@ -68,6 +72,18 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
     // Add zoom control
     L.control.zoom({ position: 'bottomright' }).addTo(map.current);
+
+    // Detect user location
+    map.current.locate({ setView: false, maxZoom: 16 });
+    
+    map.current.on('locationfound', function(e) {
+      // User location found - marker will be added by the markers effect
+      console.log('User location found:', e.latlng);
+    });
+
+    map.current.on('locationerror', function(e) {
+      console.log('Location error:', e.message);
+    });
 
     setMapReady(true);
 
@@ -78,6 +94,64 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
       }
     };
   }, []);
+
+  // Handle map clicks for location selection
+  useEffect(() => {
+    if (!map.current) return;
+
+    const handleClick = (e) => {
+      if (isSelectingLocation) {
+        const { lat, lng } = e.latlng;
+        
+        // Remove previous selection marker
+        if (selectedMarkerRef.current) {
+          map.current.removeLayer(selectedMarkerRef.current);
+        }
+
+        // Add new selection marker
+        selectedMarkerRef.current = L.marker([lat, lng], {
+          icon: L.divIcon({
+            html: `
+              <div style="
+                width: 30px;
+                height: 30px;
+                background: #10B981;
+                border: 3px solid white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              ">
+                📍
+              </div>
+            `,
+            iconSize: [30, 30],
+            className: 'selected-location-marker'
+          })
+        }).addTo(map.current);
+
+        // Call the callback
+        if (onMapClick) {
+          onMapClick({ lat, lng });
+        }
+
+        // Disable selection mode after selecting
+        if (onSelectionComplete) {
+          onSelectionComplete();
+        }
+      }
+    };
+
+    map.current.on('click', handleClick);
+
+    return () => {
+      if (map.current) {
+        map.current.off('click', handleClick);
+      }
+    };
+  }, [isSelectingLocation, onMapClick, onSelectionComplete]);
 
   const handleLayerChange = (layerKey) => {
     if (!map.current) return;
@@ -140,6 +214,11 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
     // Add buildings
     buildings.forEach((building) => {
+      if (!building.coordinates || building.coordinates.latitude === undefined || building.coordinates.longitude === undefined) {
+        console.warn('Invalid building coordinates:', building);
+        return;
+      }
+
       const marker = L.marker(
         [building.coordinates.latitude, building.coordinates.longitude],
         { icon: createCustomIcon('🏢', '#2563EB') }
@@ -159,6 +238,11 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
     // Add rooms
     rooms.forEach((room) => {
+      if (!room.coordinates || room.coordinates.latitude === undefined || room.coordinates.longitude === undefined) {
+        console.warn('Invalid room coordinates:', room);
+        return;
+      }
+
       const marker = L.marker(
         [room.coordinates.latitude, room.coordinates.longitude],
         { icon: createCustomIcon('🚪', '#10B981') }
@@ -178,6 +262,11 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
     // Add landmarks
     landmarks.forEach((landmark) => {
+      if (!landmark.coordinates || landmark.coordinates.latitude === undefined || landmark.coordinates.longitude === undefined) {
+        console.warn('Invalid landmark coordinates:', landmark);
+        return;
+      }
+
       const marker = L.marker(
         [landmark.coordinates.latitude, landmark.coordinates.longitude],
         { icon: createCustomIcon('📍', '#F59E0B') }
@@ -196,7 +285,7 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
     });
 
     // Add user location
-    if (userLocation) {
+    if (userLocation && userLocation.lat !== undefined && userLocation.lng !== undefined) {
       const userMarker = L.marker(
         [userLocation.lat, userLocation.lng],
         {
@@ -239,44 +328,120 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
   useEffect(() => {
     if (map.current && selectedLocation && mapReady) {
-      map.current.flyTo([selectedLocation.lat, selectedLocation.lng], 18, {
-        duration: 2
-      });
+      const lat = selectedLocation.lat || selectedLocation.coordinates?.latitude;
+      const lng = selectedLocation.lng || selectedLocation.coordinates?.longitude;
+      
+      if (lat !== undefined && lng !== undefined) {
+        map.current.flyTo([lat, lng], 18, {
+          duration: 2
+        });
+      }
     }
   }, [selectedLocation, mapReady]);
 
   const addRouteToMap = (routeData) => {
     if (!map.current || !routeData || !routeData.geometry) return;
 
-    // Remove existing route
+    // Remove existing routing control
+    if (routingControlRef.current) {
+      map.current.removeControl(routingControlRef.current);
+      routingControlRef.current = null;
+    }
+
+    // Remove existing route layer
     if (routeLayerRef.current) {
       map.current.removeLayer(routeLayerRef.current);
     }
 
-    // Create GeoJSON feature from route
-    const geoJsonFeature = {
-      type: 'Feature',
-      geometry: routeData.geometry,
-      properties: routeData.properties || {}
-    };
+    // Extract start and end coordinates from route
+    const coordinates = routeData.geometry.coordinates;
+    if (coordinates.length < 2) return;
 
-    // Add route as polyline
-    routeLayerRef.current = L.geoJSON(geoJsonFeature, {
-      style: {
-        color: '#3B82F6',
-        weight: 5,
-        opacity: 0.9,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }
+    const startCoord = coordinates[0];
+    const endCoord = coordinates[coordinates.length - 1];
+
+    // Create waypoints for routing
+    const waypoints = [
+      L.latLng(startCoord[1], startCoord[0]),
+      L.latLng(endCoord[1], endCoord[0])
+    ];
+
+    // Add Leaflet Routing Machine control
+    routingControlRef.current = L.Routing.control({
+      waypoints: waypoints,
+      routeWhileDragging: false,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      fitSelectedRoutes: true,
+      showAlternatives: false,
+      lineOptions: {
+        styles: [
+          { color: '#3B82F6', opacity: 0.9, weight: 5, lineCap: 'round', lineJoin: 'round' }
+        ]
+      },
+      altLineOptions: {
+        styles: [
+          { color: '#9CA3AF', opacity: 0.5, weight: 3, lineCap: 'round', lineJoin: 'round' }
+        ]
+      },
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+        profile: 'foot'
+      }),
+      plan: L.Routing.plan(waypoints, {
+        createMarker: function(i, wp) {
+          if (i === 0) {
+            return L.marker(wp.latLng, {
+              icon: L.divIcon({
+                html: `
+                  <div style="
+                    width: 30px;
+                    height: 30px;
+                    background: #10B981;
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                  ">
+                    📍
+                  </div>
+                `,
+                iconSize: [30, 30]
+              })
+            }).bindPopup('Start Location');
+          } else if (i === 1) {
+            return L.marker(wp.latLng, {
+              icon: L.divIcon({
+                html: `
+                  <div style="
+                    width: 30px;
+                    height: 30px;
+                    background: #EF4444;
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                  ">
+                    🎯
+                  </div>
+                `,
+                iconSize: [30, 30]
+              })
+            }).bindPopup('Destination');
+          }
+        }
+      })
     }).addTo(map.current);
 
     // Fit bounds to route
-    const bounds = routeLayerRef.current.getBounds();
-    map.current.fitBounds(bounds, {
-      padding: [100, 100],
-      duration: 2
-    });
+    const bounds = L.latLngBounds(waypoints);
+    map.current.fitBounds(bounds, { padding: [100, 100] });
   };
 
   useEffect(() => {
@@ -322,6 +487,27 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {isSelectingLocation && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-green-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2"
+        >
+          <span className="text-lg">📍</span>
+          <span className="font-semibold">Click on map to select location</span>
+          <button
+            onClick={() => {
+              if (onSelectionComplete) {
+                onSelectionComplete();
+              }
+            }}
+            className="ml-4 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm font-medium transition-colors"
+          >
+            Cancel
+          </button>
+        </motion.div>
+      )}
 
       <div ref={mapContainer} className="w-full h-full" />
 
