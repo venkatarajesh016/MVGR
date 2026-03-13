@@ -3,8 +3,7 @@ const router = express.Router();
 const Building = require('../models/Building');
 const Room = require('../models/Room');
 const Landmark = require('../models/Landmark');
-const { generateWalkablePath } = require('../utils/pathfinder');
-const { getGraphHopperRoute } = require('../utils/graphhopper');
+const { getOSRMRoute, getGraphHopperRoute } = require('../utils/graphhopper');
 
 // Search endpoint
 router.get('/search', async (req, res) => {
@@ -38,45 +37,62 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get walkable route between two points
+// Get walkable route between two points using OpenStreetMap
 router.get('/route', async (req, res) => {
   try {
-    const { startLat, startLng, endLat, endLng, startBuilding, endBuilding, useGraphHopper } = req.query;
+    const { startLat, startLng, endLat, endLng } = req.query;
 
     if (!startLat || !startLng || !endLat || !endLng) {
       return res.status(400).json({ message: 'All coordinates are required' });
     }
 
-    let route = null;
+    const start = {
+      lat: parseFloat(startLat),
+      lng: parseFloat(startLng)
+    };
 
-    // Try GraphHopper first if requested or API key is available
-    if (useGraphHopper !== 'false' && process.env.GRAPHHOPPER_API_KEY && 
-        process.env.GRAPHHOPPER_API_KEY !== 'your_graphhopper_api_key_here') {
-      route = await getGraphHopperRoute(
-        parseFloat(startLat),
-        parseFloat(startLng),
-        parseFloat(endLat),
-        parseFloat(endLng),
-        'foot' // Walking/pedestrian paths only
-      );
+    const end = {
+      lat: parseFloat(endLat),
+      lng: parseFloat(endLng)
+    };
+
+    // Check if start and end are the same
+    const distance = calculateDistance(start.lat, start.lng, end.lat, end.lng);
+    if (distance < 10) {
+      return res.json({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [[start.lng, start.lat]]
+        },
+        properties: {
+          distance: 0,
+          time: 0,
+          pathType: 'same_location',
+          instructions: ['You are already at the destination']
+        }
+      });
     }
 
-    // Fallback to campus walkway pathfinding if GraphHopper fails
+    // Try OSRM first (OpenStreetMap - free, no API key needed)
+    let route = await getOSRMRoute(start.lat, start.lng, end.lat, end.lng, 'foot');
+
+    // Fallback to GraphHopper if OSRM fails
     if (!route) {
-      console.log('🚶 Using campus walkway pathfinding...');
-      route = generateWalkablePath(
-        parseFloat(startLat),
-        parseFloat(startLng),
-        parseFloat(endLat),
-        parseFloat(endLng),
-        startBuilding,
-        endBuilding
-      );
+      console.log('🔄 OSRM failed, trying GraphHopper...');
+      route = await getGraphHopperRoute(start.lat, start.lng, end.lat, end.lng, 'foot');
+    }
+
+    if (!route) {
+      return res.status(500).json({
+        message: 'Unable to calculate route. Please try again.',
+        error: 'No routing service available'
+      });
     }
 
     // Get images of buildings/landmarks along the route
-    if (route && route.properties && route.properties.waypoints) {
-      const waypointImages = await getWaypointImages(route.properties.waypoints);
+    if (route && route.properties) {
+      const waypointImages = await getWaypointImages(start, end);
       route.properties.waypointImages = waypointImages;
       console.log(`📸 Found ${waypointImages.length} images along the route`);
     }
@@ -89,100 +105,87 @@ router.get('/route', async (req, res) => {
 });
 
 // Helper function to get images for waypoints
-async function getWaypointImages(waypoints) {
+async function getWaypointImages(startPoint, endPoint) {
   const images = [];
   
-  // Map of ALL road nodes to nearby buildings/landmarks
-  const nodeToLocation = {
-    // Buildings
-    'main_gate': 'Main Gate',
-    'central_plaza': 'Main Academic Block',
-    'cs_block_road': 'Computer Science Block',
-    'eng_block_a_road': 'Engineering Block A',
-    'eng_block_b_road': 'Engineering Block B',
-    'library_road': 'Library Building',
-    'admin_road': 'Administration Office',
-    'north_junction': 'Student Center',
-    'cafeteria_road': 'Cafeteria',
-    'hostel_a_road': 'Hostel Block A',
-    'hostel_b_road': 'Hostel Block B',
-    'sports_road': 'Sports Complex',
-    'auditorium_road': 'Auditorium',
-    'science_lab_road': 'Science Lab Block',
-    'workshop_road': 'Workshop Building',
-    'medical_road': 'Medical Center',
-    'north_gate': 'North Gate',
-    'parking_a_road': 'Parking Area A',
-    'parking_b_road': 'Parking Area B',
-    
-    // Landmarks
-    'garden_path': 'Central Garden',
-    'fountain_plaza': 'Fountain Plaza',
-    'basketball_court': 'Basketball Court',
-    'football_ground': 'Football Ground',
-    'bus_stop': 'Bus Stop',
-    'cycle_stand': 'Cycle Stand',
-    
-    // Road junctions - map to nearest landmark/building
-    'main_road_north': 'Student Center',
-    'main_road_south': 'Administration Office',
-    'main_road_east': 'Cafeteria',
-    'main_road_west': 'Library Building',
-    'south_junction': 'Administration Office',
-    'east_junction': 'Cafeteria',
-    'west_junction': 'Library Building'
-  };
+  try {
+    // Get all buildings and landmarks
+    const [buildings, landmarks] = await Promise.all([
+      Building.find({}),
+      Landmark.find({})
+    ]);
 
-  for (const waypoint of waypoints) {
-    const locationName = nodeToLocation[waypoint];
-    if (locationName) {
-      // Try to find building first
-      const building = await Building.findOne({ name: locationName });
-      if (building) {
-        const imageUrl = building.image 
-          ? (building.image.startsWith('http') ? building.image : `http://localhost:5000${building.image}`)
-          : `https://picsum.photos/seed/${encodeURIComponent(locationName)}/400/300`;
-        
-        images.push({
-          waypoint: waypoint,
-          name: locationName,
-          image: imageUrl,
-          type: 'building',
-          coordinates: building.coordinates
-        });
-        continue;
-      }
+    // Combine all locations
+    const allLocations = [
+      ...buildings.map(b => ({
+        name: b.name,
+        lat: b.coordinates.latitude,
+        lng: b.coordinates.longitude,
+        image: b.image,
+        type: 'building'
+      })),
+      ...landmarks.map(l => ({
+        name: l.name,
+        lat: l.coordinates.latitude,
+        lng: l.coordinates.longitude,
+        image: l.image,
+        type: 'landmark'
+      }))
+    ];
 
-      // Try to find landmark
-      const landmark = await Landmark.findOne({ name: locationName });
-      if (landmark) {
-        const imageUrl = landmark.image 
-          ? (landmark.image.startsWith('http') ? landmark.image : `http://localhost:5000${landmark.image}`)
-          : `https://picsum.photos/seed/${encodeURIComponent(locationName)}/400/300`;
-        
-        images.push({
-          waypoint: waypoint,
-          name: locationName,
-          image: imageUrl,
-          type: 'landmark',
-          coordinates: landmark.coordinates
-        });
-        continue;
-      }
+    // Find locations near the route (within 50m of start/end or between them)
+    const nearbyLocations = allLocations.filter(loc => {
+      const distToStart = calculateDistance(startPoint.lat, startPoint.lng, loc.lat, loc.lng);
+      const distToEnd = calculateDistance(endPoint.lat, endPoint.lng, loc.lat, loc.lng);
+      
+      // Include if within 100m of start or end
+      return distToStart < 100 || distToEnd < 100;
+    });
 
-      // If no building or landmark found, add placeholder
+    // Sort by distance from start
+    nearbyLocations.sort((a, b) => {
+      const distA = calculateDistance(startPoint.lat, startPoint.lng, a.lat, a.lng);
+      const distB = calculateDistance(startPoint.lat, startPoint.lng, b.lat, b.lng);
+      return distA - distB;
+    });
+
+    // Add images for nearby locations
+    for (const location of nearbyLocations) {
+      const imageUrl = location.image 
+        ? (location.image.startsWith('http') ? location.image : `http://localhost:5000${location.image}`)
+        : `https://picsum.photos/seed/${encodeURIComponent(location.name)}/400/300`;
+      
       images.push({
-        waypoint: waypoint,
-        name: locationName,
-        image: `https://picsum.photos/seed/${encodeURIComponent(locationName)}/400/300`,
-        type: 'placeholder',
-        coordinates: null
+        name: location.name,
+        image: imageUrl,
+        type: location.type,
+        coordinates: {
+          latitude: location.lat,
+          longitude: location.lng
+        }
       });
     }
+  } catch (error) {
+    console.error('Error getting waypoint images:', error);
   }
 
-  console.log(`📸 Returning ${images.length} waypoint images`);
   return images;
+}
+
+// Helper function to calculate distance between two points
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
 }
 
 module.exports = router;

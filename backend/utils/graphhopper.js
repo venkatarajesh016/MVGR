@@ -1,10 +1,10 @@
 const axios = require('axios');
 
-const GRAPHHOPPER_API_KEY = process.env.GRAPHHOPPER_API_KEY;
-const GRAPHHOPPER_BASE_URL = 'https://graphhopper.com/api/1';
+// OSRM (Open Source Routing Machine) - Free, no API key needed
+const OSRM_BASE_URL = 'https://router.project-osrm.org/route/v1';
 
 /**
- * Get route from GraphHopper API
+ * Get route from OSRM (OpenStreetMap Routing Machine)
  * @param {number} startLat - Start latitude
  * @param {number} startLng - Start longitude
  * @param {number} endLat - End latitude
@@ -12,17 +12,141 @@ const GRAPHHOPPER_BASE_URL = 'https://graphhopper.com/api/1';
  * @param {string} profile - Routing profile (foot, car, bike)
  * @returns {Promise<Object>} Route data
  */
-async function getGraphHopperRoute(startLat, startLng, endLat, endLng, profile = 'foot') {
+async function getOSRMRoute(startLat, startLng, endLat, endLng, profile = 'foot') {
   try {
-    // Check if API key is configured
+    console.log('🗺️  Requesting route from OpenStreetMap (OSRM)...');
+
+    // Map profile names to OSRM profiles
+    const profileMap = {
+      'foot': 'foot',
+      'walking': 'foot',
+      'pedestrian': 'foot',
+      'car': 'car',
+      'bike': 'bike',
+      'bicycle': 'bike'
+    };
+
+    const osrmProfile = profileMap[profile] || 'foot';
+
+    // OSRM expects coordinates as lng,lat (not lat,lng)
+    const coordinates = `${startLng},${startLat};${endLng},${endLat}`;
+
+    const response = await axios.get(
+      `${OSRM_BASE_URL}/${osrmProfile}/${coordinates}`,
+      {
+        params: {
+          overview: 'full',
+          steps: true,
+          geometries: 'geojson',
+          continue_straight: true
+        },
+        timeout: 10000
+      }
+    );
+
+    if (response.data && response.data.routes && response.data.routes.length > 0) {
+      const route = response.data.routes[0];
+      
+      console.log('✅ OpenStreetMap route calculated successfully');
+      console.log(`   Distance: ${Math.round(route.distance)}m`);
+      console.log(`   Time: ${Math.round(route.duration / 60)} minutes`);
+      
+      // Extract waypoints from route legs
+      const waypoints = [];
+      if (response.data.waypoints) {
+        response.data.waypoints.forEach(wp => {
+          waypoints.push({
+            lat: wp.location[1],
+            lng: wp.location[0],
+            name: wp.name || 'Waypoint'
+          });
+        });
+      }
+
+      return {
+        type: 'Feature',
+        geometry: route.geometry,
+        properties: {
+          distance: Math.round(route.distance),
+          time: Math.round(route.duration / 60), // Convert seconds to minutes
+          duration: Math.round(route.duration),
+          instructions: extractInstructions(route.legs),
+          pathType: 'osrm',
+          profile: osrmProfile,
+          waypoints: waypoints
+        }
+      };
+    }
+
+    console.log('⚠️  OSRM returned no routes');
+    return null;
+  } catch (error) {
+    console.error('❌ OSRM API error:', error.message);
+    if (error.response) {
+      console.error('   Status:', error.response.status);
+      console.error('   Data:', error.response.data);
+    }
+    return null;
+  }
+}
+
+/**
+ * Extract turn-by-turn instructions from route legs
+ */
+function extractInstructions(legs) {
+  const instructions = [];
+  
+  legs.forEach((leg, legIndex) => {
+    if (leg.steps) {
+      leg.steps.forEach((step, stepIndex) => {
+        if (step.maneuver) {
+          const maneuver = step.maneuver;
+          let instruction = '';
+
+          switch (maneuver.type) {
+            case 'turn':
+              instruction = `Turn ${maneuver.modifier} for ${Math.round(step.distance)}m`;
+              break;
+            case 'new name':
+              instruction = `Continue on ${step.name || 'road'} for ${Math.round(step.distance)}m`;
+              break;
+            case 'depart':
+              instruction = `Start on ${step.name || 'road'}`;
+              break;
+            case 'arrive':
+              instruction = `Arrive at destination`;
+              break;
+            default:
+              instruction = `${maneuver.type} ${maneuver.modifier || ''} for ${Math.round(step.distance)}m`;
+          }
+
+          if (instruction) {
+            instructions.push({
+              text: instruction,
+              distance: Math.round(step.distance),
+              duration: Math.round(step.duration),
+              name: step.name
+            });
+          }
+        }
+      });
+    }
+  });
+
+  return instructions;
+}
+
+/**
+ * Get route from GraphHopper API (fallback)
+ */
+async function getGraphHopperRoute(startLat, startLng, endLat, endLng, profile = 'foot') {
+  const GRAPHHOPPER_API_KEY = process.env.GRAPHHOPPER_API_KEY;
+  const GRAPHHOPPER_BASE_URL = 'https://graphhopper.com/api/1';
+
+  try {
     if (!GRAPHHOPPER_API_KEY || 
         GRAPHHOPPER_API_KEY === 'your_graphhopper_api_key_here' ||
         GRAPHHOPPER_API_KEY.trim() === '') {
-      console.log('ℹ️  GraphHopper API key not configured. Using campus routing.');
-      console.log('📝 To enable GraphHopper:');
-      console.log('   1. Sign up at https://www.graphhopper.com/');
-      console.log('   2. Get your free API key');
-      console.log('   3. Add to backend/.env: GRAPHHOPPER_API_KEY=your_key_here');
       return null;
     }
 
@@ -56,7 +180,7 @@ async function getGraphHopperRoute(startLat, startLng, endLat, endLng, profile =
         },
         properties: {
           distance: Math.round(path.distance),
-          time: Math.round(path.time / 1000 / 60), // Convert ms to minutes
+          time: Math.round(path.time / 1000 / 60),
           instructions: path.instructions.map(inst => ({
             text: inst.text,
             distance: Math.round(inst.distance),
@@ -69,63 +193,14 @@ async function getGraphHopperRoute(startLat, startLng, endLat, endLng, profile =
       };
     }
 
-    console.log('⚠️  GraphHopper returned no paths');
     return null;
   } catch (error) {
-    if (error.response) {
-      // API returned an error
-      console.error('❌ GraphHopper API error:', error.response.status);
-      if (error.response.status === 400) {
-        console.error('   Invalid API key or request parameters');
-        console.error('   Please check your GRAPHHOPPER_API_KEY in .env file');
-      } else if (error.response.status === 401) {
-        console.error('   Unauthorized - Invalid API key');
-      } else if (error.response.status === 429) {
-        console.error('   Rate limit exceeded (500 requests/day on free tier)');
-      }
-    } else if (error.request) {
-      // Request made but no response
-      console.error('❌ GraphHopper API timeout or network error');
-    } else {
-      console.error('❌ GraphHopper error:', error.message);
-    }
-    return null;
-  }
-}
-
-/**
- * Get isochrone (reachable area) from a point
- * @param {number} lat - Center latitude
- * @param {number} lng - Center longitude
- * @param {number} timeLimit - Time limit in seconds
- * @param {string} profile - Routing profile
- * @returns {Promise<Object>} Isochrone data
- */
-async function getIsochrone(lat, lng, timeLimit = 300, profile = 'foot') {
-  try {
-    if (!GRAPHHOPPER_API_KEY || 
-        GRAPHHOPPER_API_KEY === 'your_graphhopper_api_key_here' ||
-        GRAPHHOPPER_API_KEY.trim() === '') {
-      return null;
-    }
-
-    const response = await axios.get(`${GRAPHHOPPER_BASE_URL}/isochrone`, {
-      params: {
-        point: `${lat},${lng}`,
-        time_limit: timeLimit,
-        profile: profile,
-        key: GRAPHHOPPER_API_KEY
-      }
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error('GraphHopper Isochrone error:', error.message);
+    console.error('❌ GraphHopper error:', error.message);
     return null;
   }
 }
 
 module.exports = {
-  getGraphHopperRoute,
-  getIsochrone
+  getOSRMRoute,
+  getGraphHopperRoute
 };
