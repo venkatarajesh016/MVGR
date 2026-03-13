@@ -32,11 +32,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Mapbox token endpoint
-app.get('/api/mapbox-token', (req, res) => {
-  res.json({ token: process.env.MAPBOX_ACCESS_TOKEN || '' });
-});
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

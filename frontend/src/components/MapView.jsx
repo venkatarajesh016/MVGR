@@ -1,66 +1,75 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, route, showLayerPanel, onLayerChange }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]);
-  const [currentStyle, setCurrentStyle] = useState('streets-v12');
-  const [mapboxToken, setMapboxToken] = useState('');
+  const routeLayerRef = useRef(null);
+  const [currentLayer, setCurrentLayer] = useState('osm');
   const [mapReady, setMapReady] = useState(false);
 
-  // Map styles
-  const mapStyles = {
-    'streets-v12': { name: 'Street Map', icon: '🗺️' },
-    'satellite-streets-v12': { name: 'Satellite', icon: '🛰️' },
-    'outdoors-v12': { name: 'Terrain', icon: '⛰️' },
-    'dark-v11': { name: 'Dark Mode', icon: '🌙' }
+  // Map tile layers
+  const mapLayers = {
+    osm: {
+      name: 'OpenStreetMap',
+      icon: '🗺️',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '© OpenStreetMap contributors'
+    },
+    satellite: {
+      name: 'Satellite',
+      icon: '🛰️',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: '© Esri'
+    },
+    terrain: {
+      name: 'Terrain',
+      icon: '⛰️',
+      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      attribution: '© OpenTopoMap'
+    },
+    dark: {
+      name: 'Dark Mode',
+      icon: '🌙',
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      attribution: '© CartoDB'
+    }
   };
-
-  // Fetch Mapbox token from backend
-  useEffect(() => {
-    fetch('/api/mapbox-token')
-      .then(res => res.json())
-      .then(data => {
-        if (data.token) {
-          mapboxgl.accessToken = data.token;
-          setMapboxToken(data.token);
-        }
-      })
-      .catch(err => console.error('Error fetching Mapbox token:', err));
-  }, []);
 
   // Initialize map
   useEffect(() => {
-    if (map.current || !mapboxToken) return;
+    if (map.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: `mapbox://styles/mapbox/${currentStyle}`,
-      center: [83.40515640049136, 18.05997021737144],
-      zoom: 17,
-      minZoom: 14,
+    map.current = L.map(mapContainer.current).setView(
+      [18.05997021737144, 83.40515640049136],
+      17
+    );
+
+    // Add initial tile layer
+    L.tileLayer(mapLayers.osm.url, {
+      attribution: mapLayers.osm.attribution,
       maxZoom: 20,
-      pitch: 0,
-      bearing: 0
-    });
+      minZoom: 14
+    }).addTo(map.current);
 
-    map.current.addControl(new mapboxgl.NavigationControl({
-      showCompass: true,
-      showZoom: true,
-      visualizePitch: true
-    }), 'bottom-right');
-    
-    map.current.addControl(new mapboxgl.ScaleControl({
-      maxWidth: 100,
-      unit: 'metric'
-    }), 'bottom-left');
+    // Add scale control
+    L.control.scale({ metric: true }).addTo(map.current);
 
-    map.current.on('load', () => {
-      setMapReady(true);
-    });
+    // Add zoom control
+    L.control.zoom({ position: 'bottomright' }).addTo(map.current);
+
+    setMapReady(true);
 
     return () => {
       if (map.current) {
@@ -68,20 +77,29 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
         map.current = null;
       }
     };
-  }, [mapboxToken]);
+  }, []);
 
-  const handleStyleChange = (styleKey) => {
-    if (map.current) {
-      map.current.setStyle(`mapbox://styles/mapbox/${styleKey}`);
-      setCurrentStyle(styleKey);
-      
-      map.current.once('style.load', () => {
-        addAllMarkers();
-        if (route) {
-          addRouteToMap(route);
-        }
-      });
-    }
+  const handleLayerChange = (layerKey) => {
+    if (!map.current) return;
+
+    const layer = mapLayers[layerKey];
+    
+    // Remove all existing tile layers
+    map.current.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer) {
+        map.current.removeLayer(layer);
+      }
+    });
+
+    // Add new tile layer
+    L.tileLayer(layer.url, {
+      attribution: layer.attribution,
+      maxZoom: 20,
+      minZoom: 14
+    }).addTo(map.current);
+
+    setCurrentLayer(layerKey);
+    
     if (onLayerChange) {
       onLayerChange();
     }
@@ -92,129 +110,116 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
     markersRef.current = [];
   };
 
-  const createMarkerElement = (emoji, color) => {
-    const el = document.createElement('div');
-    el.className = 'custom-marker';
-    el.innerHTML = `
-      <div style="
-        width: 32px;
-        height: 32px;
-        background: ${color};
-        border: 3px solid white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        cursor: pointer;
-        transition: transform 0.2s ease;
-        pointer-events: auto;
-      ">
-        ${emoji}
-      </div>
-    `;
-    
-    const innerDiv = el.querySelector('div');
-    el.addEventListener('mouseenter', () => {
-      if (innerDiv) {
-        innerDiv.style.transform = 'scale(1.15)';
-      }
+  const createCustomIcon = (emoji, color) => {
+    return L.divIcon({
+      html: `
+        <div style="
+          width: 40px;
+          height: 40px;
+          background: ${color};
+          border: 3px solid white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          cursor: pointer;
+        ">
+          ${emoji}
+        </div>
+      `,
+      iconSize: [40, 40],
+      className: 'custom-marker'
     });
-    el.addEventListener('mouseleave', () => {
-      if (innerDiv) {
-        innerDiv.style.transform = 'scale(1)';
-      }
-    });
-    
-    return el;
   };
 
   const addAllMarkers = () => {
     if (!map.current) return;
     clearMarkers();
 
+    // Add buildings
     buildings.forEach((building) => {
-      const el = createMarkerElement('🏢', '#2563EB');
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      const marker = L.marker(
+        [building.coordinates.latitude, building.coordinates.longitude],
+        { icon: createCustomIcon('🏢', '#2563EB') }
+      ).addTo(map.current);
+
+      const popupContent = `
         <div style="padding: 12px; min-width: 200px;">
           ${building.image ? `<img src="${building.image}" alt="${building.name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
           <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">${building.name}</h3>
           <p style="font-size: 13px; color: #6B7280; margin: 0;">${building.description || ''}</p>
         </div>
-      `);
-      
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([building.coordinates.lng, building.coordinates.lat])
-        .setPopup(popup)
-        .addTo(map.current);
-      
+      `;
+
+      marker.bindPopup(popupContent);
       markersRef.current.push(marker);
     });
 
+    // Add rooms
     rooms.forEach((room) => {
-      const el = createMarkerElement('🚪', '#10B981');
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      const marker = L.marker(
+        [room.coordinates.latitude, room.coordinates.longitude],
+        { icon: createCustomIcon('🚪', '#10B981') }
+      ).addTo(map.current);
+
+      const popupContent = `
         <div style="padding: 12px; min-width: 180px;">
           <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">Room ${room.roomNumber}</h3>
           <p style="font-size: 13px; color: #6B7280; margin: 2px 0;">${room.buildingId?.name || ''}</p>
           <p style="font-size: 12px; color: #9CA3AF; margin: 2px 0;">Floor ${room.floor} • ${room.department}</p>
         </div>
-      `);
-      
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([room.coordinates.lng, room.coordinates.lat])
-        .setPopup(popup)
-        .addTo(map.current);
-      
+      `;
+
+      marker.bindPopup(popupContent);
       markersRef.current.push(marker);
     });
 
+    // Add landmarks
     landmarks.forEach((landmark) => {
-      const el = createMarkerElement('📍', '#F59E0B');
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      const marker = L.marker(
+        [landmark.coordinates.latitude, landmark.coordinates.longitude],
+        { icon: createCustomIcon('📍', '#F59E0B') }
+      ).addTo(map.current);
+
+      const popupContent = `
         <div style="padding: 12px; min-width: 200px;">
           ${landmark.image ? `<img src="${landmark.image}" alt="${landmark.name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
           <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #1F2937;">${landmark.name}</h3>
           <p style="font-size: 13px; color: #6B7280; margin: 0;">${landmark.description || ''}</p>
         </div>
-      `);
-      
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([landmark.coordinates.lng, landmark.coordinates.lat])
-        .setPopup(popup)
-        .addTo(map.current);
-      
+      `;
+
+      marker.bindPopup(popupContent);
       markersRef.current.push(marker);
     });
 
+    // Add user location
     if (userLocation) {
-      const userEl = document.createElement('div');
-      userEl.className = 'user-location-marker';
-      userEl.innerHTML = `
-        <div style="
-          width: 20px;
-          height: 20px;
-          background: #EF4444;
-          border: 4px solid white;
-          border-radius: 50%;
-          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-          animation: pulse 2s infinite;
-        "></div>
-      `;
-      
-      const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(`
-        <div style="padding: 8px;">
-          <p style="font-weight: 600; margin: 0;">Your Location</p>
-        </div>
-      `);
-      
-      const marker = new mapboxgl.Marker({ element: userEl })
-        .setLngLat([userLocation.lng, userLocation.lat])
-        .setPopup(popup)
-        .addTo(map.current);
-      
-      markersRef.current.push(marker);
+      const userMarker = L.marker(
+        [userLocation.lat, userLocation.lng],
+        {
+          icon: L.divIcon({
+            html: `
+              <div style="
+                width: 20px;
+                height: 20px;
+                background: #EF4444;
+                border: 4px solid white;
+                border-radius: 50%;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                animation: pulse 2s infinite;
+              "></div>
+            `,
+            iconSize: [20, 20],
+            className: 'user-location-marker'
+          })
+        }
+      ).addTo(map.current);
+
+      userMarker.bindPopup('<div style="padding: 8px;"><p style="font-weight: 600; margin: 0;">Your Location</p></div>');
+      markersRef.current.push(userMarker);
     }
   };
 
@@ -226,20 +231,16 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
 
   useEffect(() => {
     if (map.current && userLocation && mapReady) {
-      map.current.flyTo({
-        center: [userLocation.lng, userLocation.lat],
-        zoom: 18,
-        duration: 2000
+      map.current.flyTo([userLocation.lat, userLocation.lng], 18, {
+        duration: 2
       });
     }
   }, [userLocation, mapReady]);
 
   useEffect(() => {
     if (map.current && selectedLocation && mapReady) {
-      map.current.flyTo({
-        center: [selectedLocation.lng, selectedLocation.lat],
-        zoom: 18,
-        duration: 2000
+      map.current.flyTo([selectedLocation.lat, selectedLocation.lng], 18, {
+        duration: 2
       });
     }
   }, [selectedLocation, mapReady]);
@@ -247,59 +248,34 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
   const addRouteToMap = (routeData) => {
     if (!map.current || !routeData || !routeData.geometry) return;
 
-    if (map.current.getLayer('route')) {
-      map.current.removeLayer('route');
-    }
-    if (map.current.getLayer('route-outline')) {
-      map.current.removeLayer('route-outline');
-    }
-    if (map.current.getSource('route')) {
-      map.current.removeSource('route');
+    // Remove existing route
+    if (routeLayerRef.current) {
+      map.current.removeLayer(routeLayerRef.current);
     }
 
-    map.current.addSource('route', {
-      type: 'geojson',
-      data: routeData
-    });
+    // Create GeoJSON feature from route
+    const geoJsonFeature = {
+      type: 'Feature',
+      geometry: routeData.geometry,
+      properties: routeData.properties || {}
+    };
 
-    map.current.addLayer({
-      id: 'route-outline',
-      type: 'line',
-      source: 'route',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#1E40AF',
-        'line-width': 8,
-        'line-opacity': 0.4
+    // Add route as polyline
+    routeLayerRef.current = L.geoJSON(geoJsonFeature, {
+      style: {
+        color: '#3B82F6',
+        weight: 5,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
       }
-    });
+    }).addTo(map.current);
 
-    map.current.addLayer({
-      id: 'route',
-      type: 'line',
-      source: 'route',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#3B82F6',
-        'line-width': 5,
-        'line-opacity': 0.9
-      }
-    });
-
-    const coordinates = routeData.geometry.coordinates;
-    const bounds = coordinates.reduce((bounds, coord) => {
-      return bounds.extend(coord);
-    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-
+    // Fit bounds to route
+    const bounds = routeLayerRef.current.getBounds();
     map.current.fitBounds(bounds, {
-      padding: { top: 100, bottom: 100, left: 100, right: 100 },
-      duration: 2000
+      padding: [100, 100],
+      duration: 2
     });
   };
 
@@ -320,23 +296,23 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
             className="absolute top-20 right-4 z-50 glass-effect rounded-xl shadow-lg overflow-hidden"
           >
             <div className="p-3">
-              <p className="text-xs font-semibold text-gray-700 px-2 mb-2">Map Style</p>
+              <p className="text-xs font-semibold text-gray-700 px-2 mb-2">Map Layer</p>
               <div className="space-y-1">
-                {Object.entries(mapStyles).map(([key, style]) => (
+                {Object.entries(mapLayers).map(([key, layer]) => (
                   <motion.button
                     key={key}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => handleStyleChange(key)}
+                    onClick={() => handleLayerChange(key)}
                     className={`w-full px-3 py-2.5 text-left text-sm rounded-lg transition-colors flex items-center gap-2 ${
-                      currentStyle === key
+                      currentLayer === key
                         ? 'bg-blue-600 text-white font-medium shadow-md'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <span className="text-base">{style.icon}</span>
-                    <span>{style.name}</span>
-                    {currentStyle === key && (
+                    <span className="text-base">{layer.icon}</span>
+                    <span>{layer.name}</span>
+                    {currentLayer === key && (
                       <span className="ml-auto text-xs">✓</span>
                     )}
                   </motion.button>
@@ -360,6 +336,11 @@ function MapView({ buildings, rooms, landmarks, selectedLocation, userLocation, 
           100% {
             box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
           }
+        }
+        
+        .leaflet-popup-content {
+          margin: 0;
+          padding: 0;
         }
       `}</style>
     </div>
